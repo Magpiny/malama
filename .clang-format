@@ -1,0 +1,13 @@
+# .clang-format — Magpiny C++23 style rules
+BasedOnStyle:                          Google
+IndentWidth:                           4
+ColumnLimit:                           100
+Standard:                              c++23
+BreakBeforeBraces:                     Attach
+PointerAlignment:                      Right
+SortIncludes:                          CaseInsensitive
+IncludeBlocks:                         Regroup
+AllowShortFunctionsOnASingleLine:      Inline
+AllowShortIfStatementsOnASingleLine:   Never
+SpaceAfterTemplateKeyword:             false
+

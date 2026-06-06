@@ -1,0 +1,30 @@
+// /////////////////////////////////////////////////////////////////////////////
+// Name:        src/common/constants.hpp
+// Purpose:     Global compile-time named constants for malama
+// Author:      Wanjare <wanjare@magpiny.dev>
+// Created:     2026-06-06
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     Apache-2.0
+// /////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+// SPDX-License-Identifier: Apache-2.0
+
+#include <string_view>
+
+namespace malama::constants {
+
+// Default Window Sizing Metrics
+inline constexpr int default_window_width = 1200;
+inline constexpr int default_window_height = 800;
+
+// Internal API & Network Target Anchors
+inline constexpr std::string_view default_ollama_endpoint = "http://localhost:11434";
+inline constexpr std::string_view fallback_model_name = "qwen2.5-coder";
+
+// Memory & Processing Constraints
+inline constexpr std::size_t absolute_max_buffer_bytes = 4096;
+inline constexpr std::size_t default_context_window_limit = 4096;
+
+} // namespace malama::constants
