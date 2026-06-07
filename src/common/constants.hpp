@@ -27,4 +27,7 @@ inline constexpr std::string_view fallback_model_name = "qwen2.5-coder";
 inline constexpr std::size_t absolute_max_buffer_bytes = 4096;
 inline constexpr std::size_t default_context_window_limit = 4096;
 
+// Protocol Handshake Definitions
+inline constexpr unsigned http_version_1_1 = 11;
+
 } // namespace malama::constants

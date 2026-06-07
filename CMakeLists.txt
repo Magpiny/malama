@@ -22,6 +22,8 @@ add_compile_definitions(SPDLOG_USE_STD_FORMAT)
 add_executable(malama
     src/main.cpp
     src/core/config_manager.cpp
+    src/network/ollama_client.cpp
+    src/network/stream_worker.cpp
     src/ui/main_frame.cpp
 )
 
@@ -43,6 +45,9 @@ target_compile_options(malama PRIVATE
 find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
+
+find_package(Boost REQUIRED)
+target_link_libraries(malama PRIVATE Boost::boost)
 
 include(FetchContent)
 FetchContent_Declare(
