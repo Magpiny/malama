@@ -1,12 +1,3 @@
-# /////////////////////////////////////////////////////////////////////////////
-# Name:        README.md
-# Purpose:     Root documentation and architectural overview for malama
-# Author:      Wanjare <wanjare@magpiny.dev>
-# Created:     2026-06-05
-# Copyright:   (c) 2026 Magpiny. All rights reserved.
-# Licence:     Apache-2.0
-# /////////////////////////////////////////////////////////////////////////////
-
 # Malama
 
 > Native Linux chat client for local LLMs — no cloud, no browser, no compromise.
