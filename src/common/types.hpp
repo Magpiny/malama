@@ -11,10 +11,10 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
+#include "common/constants.hpp"
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "common/constants.hpp"
 
 namespace malama::common {
 
@@ -31,6 +31,14 @@ enum class ConfigError : std::uint8_t {
     PermissionDenied,
     InvalidJsonSyntax,
     SchemaMismatch
+};
+
+// New: Explicitly pinned to 1 byte network failure classification engine
+enum class NetworkError : std::uint8_t {
+    HostUnreachable,
+    InvalidResponse,
+    StreamInterrupted,
+    ExecutionCancelled
 };
 
 struct Message {
@@ -51,8 +59,8 @@ struct Session {
 };
 
 struct AppSettings {
-    std::string m_ollama_endpoint{"http://localhost:11434"};
-    std::string m_fallback_model{"qwen2.5-coder"};
+    std::string m_ollama_endpoint{constants::default_ollama_endpoint};
+    std::string m_fallback_model{constants::fallback_model_name};
     std::size_t m_context_window_limit{constants::default_context_window_limit};
     bool m_stream_tokens{true};
 };
