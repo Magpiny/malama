@@ -65,3 +65,5 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 target_link_libraries(malama PRIVATE spdlog::spdlog)
+
+add_subdirectory(tests)
