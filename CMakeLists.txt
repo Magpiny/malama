@@ -2,13 +2,18 @@
 # Name:        CMakeLists.txt
 # Purpose:     Root modern target-based compilation build for malama
 # Author:      Wanjare <wanjare@magpiny.dev>
-# Created:     2026-06-06
+# Created:     2026-06-08
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
 # Licence:     Apache-2.0
 # /////////////////////////////////////////////////////////////////////////////
 
-cmake_minimum_required(VERSION 4.2)
+cmake_minimum_required(VERSION 3.28)
 project(malama CXX)
+
+# Enforce policy CMP0167 to suppress modern legacy FindBoost deprecation warnings
+if(POLICY CMP0167)
+    cmake_policy(SET CMP0167 NEW)
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,7 +23,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_compile_definitions(SPDLOG_USE_STD_FORMAT)
 
-# Add all source translation units explicitly
 add_executable(malama
     src/main.cpp
     src/core/config_manager.cpp
@@ -42,10 +46,12 @@ target_compile_options(malama PRIVATE
     -D_FORTIFY_SOURCE=2
 )
 
-find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base)
+# Extract native UI components
+find_package(wxWidgets 3.3 REQUIRED COMPONENTS core base)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 
+# Explicitly require the Boost framework to guarantee hermetic environment resolution
 find_package(Boost REQUIRED)
 target_link_libraries(malama PRIVATE Boost::boost)
 
