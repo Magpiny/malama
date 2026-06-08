@@ -2,5 +2,7 @@ build
 .cache
 commit_mssg.txt
 libs
-
+build_arch
+build_fedora
+build_ubuntu
 
