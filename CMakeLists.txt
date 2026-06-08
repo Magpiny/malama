@@ -47,7 +47,7 @@ target_compile_options(malama PRIVATE
 )
 
 # Extract native UI components
-find_package(wxWidgets 3.3 REQUIRED COMPONENTS core base)
+find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 

@@ -57,7 +57,7 @@ public:
             [frame_ptr](std::string_view token) mutable {
                 // Safely post events across thread boundaries into the main loop
                 auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
-                if (event_ptr) {
+                if (event_ptr!=nullptr) {
                     event_ptr->SetString(wxString::FromUTF8(token.data(), token.size()));
                     wxQueueEvent(frame_ptr, event_ptr);
                 }
