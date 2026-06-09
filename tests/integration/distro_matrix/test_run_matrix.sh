@@ -437,12 +437,12 @@ assert_not_contains \
 assert_contains \
     "CMakeLists.txt requires wxWidgets 3.3 (bumped from 3.2)" \
     "${ROOT_CMAKE}" \
-    "find_package(wxWidgets 3.3 REQUIRED"
+    "find_package(wxWidgets 3.2 REQUIRED"
 
 assert_not_contains \
-    "CMakeLists.txt no longer requires wxWidgets 3.2" \
+    "CMakeLists.txt no longer requires wxWidgets 3.3" \
     "${ROOT_CMAKE}" \
-    "find_package(wxWidgets 3.2 REQUIRED"
+    "find_package(wxWidgets 3.3 REQUIRED"
 
 assert_contains \
     "CMakeLists.txt sets CMP0167 policy to suppress FindBoost deprecation" \

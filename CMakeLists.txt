@@ -1,7 +1,7 @@
 # /////////////////////////////////////////////////////////////////////////////
 # Name:        CMakeLists.txt
 # Purpose:     Root modern target-based compilation build for malama
-# Author:      Wanjare <wanjare@magpiny.dev>
+# Author:      Wanjare <samuelwanjare@protonmail.com>
 # Created:     2026-06-08
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
 # Licence:     Apache-2.0
@@ -29,6 +29,8 @@ add_executable(malama
     src/network/ollama_client.cpp
     src/network/stream_worker.cpp
     src/ui/main_frame.cpp
+    src/ui/sidebar_panel.cpp
+    src/ui/chat_panel.cpp
 )
 
 target_compile_features(malama PUBLIC cxx_std_23)
@@ -47,7 +49,7 @@ target_compile_options(malama PRIVATE
 )
 
 # Extract native UI components
-find_package(wxWidgets 3.3 REQUIRED COMPONENTS core base)
+find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 

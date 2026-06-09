@@ -33,11 +33,14 @@ for distro in ubuntu fedora arch; do
         .
     
     # Mount workspace into container to compile and evaluate warnings
-    docker run --rm -v "${PROJECT_ROOT}:/workspace" "malama-test:${distro}" bash -c "
+    docker run --rm \
+    --user "$(id -u):$(id -g)" \
+    -v "${PROJECT_ROOT}:/workspace" \
+    "malama-test:${distro}" bash -c "
         mkdir -p build_${distro} && cd build_${distro} && \
         cmake -DCMAKE_BUILD_TYPE=Release .. && \
         make -j\$(nproc)
-    "
+    " 
     echo "✅ Target environment ${distro} compiled cleanly with ZERO errors."
 done
 

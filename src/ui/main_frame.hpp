@@ -2,7 +2,7 @@
 // Name:        src/ui/main_frame.hpp
 // Purpose:     Top-level workspace frame containing native menu actions
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-08
+// Created:     2026-06-09
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -13,10 +13,13 @@
 
 #include <cstdint>
 #include <wx/wx.h>
+#include <wx/splitter.h>
 
 namespace malama::ui {
 
-// Declare the custom cross-thread token notification event cleanly
+class SidebarPanel;
+class ChatPanel;
+
 wxDECLARE_EVENT(EVT_MALAMA_TOKEN, wxThreadEvent);
 
 class MainFrame final : public wxFrame {
@@ -31,6 +34,7 @@ public:
 
 private:
     void SetupMenuBar() noexcept;
+    void SetupWorkspaceLayout() noexcept;
     void BindActionEvents() noexcept;
 
     // Menu Item Interaction Actions
@@ -38,7 +42,6 @@ private:
     void OnAboutAction([[maybe_unused]] wxCommandEvent &event);
     void OnLicenceAction([[maybe_unused]] wxCommandEvent &event);
 
-    // Thread Notification Consumer - Made static to resolve static analysis metrics
     static void OnTokenReceived(wxThreadEvent &event);
 
     enum class MenuId : std::uint16_t {
@@ -46,6 +49,11 @@ private:
         AboutId = wxID_ABOUT,
         LicenceId = wxID_HIGHEST + 1
     };
+
+    // Structural Resizable Layout Component Panes
+    wxSplitterWindow *m_splitter_window_ptr = nullptr;
+    SidebarPanel *m_sidebar_panel_ptr = nullptr;
+    ChatPanel *m_chat_panel_ptr = nullptr;
 };
 
 } // namespace malama::ui
