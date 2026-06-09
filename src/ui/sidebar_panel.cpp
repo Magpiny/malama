@@ -26,7 +26,7 @@ SidebarPanel::SidebarPanel(wxWindow *parent_ptr)
 }
 
 void SidebarPanel::SetupLayout() noexcept {
-    auto *sizer_ptr = new wxBoxSizer(wxVERTICAL);
+    auto *sizer_ptr = new (std::nothrow) wxBoxSizer(wxVERTICAL);
     if (sizer_ptr == nullptr) {
         return;
     }

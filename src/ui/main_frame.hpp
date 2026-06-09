@@ -25,7 +25,7 @@ wxDECLARE_EVENT(EVT_MALAMA_TOKEN, wxThreadEvent);
 class MainFrame final : public wxFrame {
 public:
     explicit MainFrame(const wxString &title, const wxPoint &pos, const wxSize &size);
-    ~MainFrame()  = default;
+    ~MainFrame() override = default;
 
     MainFrame(const MainFrame &) = delete;
     MainFrame &operator=(const MainFrame &) = delete;
