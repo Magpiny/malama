@@ -26,10 +26,13 @@ public:
     ChatPanel(ChatPanel &&) noexcept = delete;
     ChatPanel &operator=(ChatPanel &&) noexcept = delete;
 
+    // Expose non-throwing token stream consumer link
+    auto AppendToken(std::string_view token_segment) noexcept -> void;
+
 private:
     void SetupLayout() noexcept;
 
-    wxTextCtrl *m_chat_display_ptr=nullptr;
+    wxTextCtrl *m_chat_display_ptr = nullptr;
 };
 
 } // namespace malama::ui

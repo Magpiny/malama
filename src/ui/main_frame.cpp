@@ -2,7 +2,7 @@
 // Name:        src/ui/main_frame.cpp
 // Purpose:     Implements top-level window controls and menu modal dialog loops
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-08
+// Created:     2026-06-09
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -19,7 +19,6 @@
 
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
-#include <wx/sizer.h>
 #include <spdlog/spdlog.h>
 
 namespace malama::ui {
@@ -34,7 +33,7 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
 }
 
 void MainFrame::SetupMenuBar() noexcept {
-    auto *menu_bar_ptr = new (std::nothrow) wxMenuBar(); // NOLINT(cppcoreguidelines-owning-memory)
+    wxMenuBar *menu_bar_ptr = new (std::nothrow) wxMenuBar(); // NOLINT(cppcoreguidelines-owning-memory)
     if (menu_bar_ptr == nullptr) {
         return;
     }
@@ -60,31 +59,33 @@ void MainFrame::SetupMenuBar() noexcept {
 }
 
 void MainFrame::SetupWorkspaceLayout() noexcept {
-    // Fixed: Added NOLINT check for framework sizer allocations
-    auto *main_sizer_ptr = new (std::nothrow) wxBoxSizer(wxHORIZONTAL); // NOLINT(cppcoreguidelines-owning-memory)
-    if (main_sizer_ptr == nullptr) {
+    // Instantiate the interactive splitter canvas container directly as a child of the Frame
+    m_splitter_window_ptr = new (std::nothrow) wxSplitterWindow(
+        this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D
+    );
+    if (m_splitter_window_ptr == nullptr) {
         return;
     }
 
-    m_sidebar_panel_ptr = new (std::nothrow) SidebarPanel(this);
+    // Allocate content panes under the parent splitter container hierarchy
+    m_sidebar_panel_ptr = new (std::nothrow) SidebarPanel(m_splitter_window_ptr);
     if (m_sidebar_panel_ptr == nullptr) {
-        delete main_sizer_ptr; // NOLINT(cppcoreguidelines-owning-memory)
+        delete m_splitter_window_ptr; // NOLINT(cppcoreguidelines-owning-memory)
         return;
     }
 
-    m_chat_panel_ptr = new (std::nothrow) ChatPanel(this);
+    m_chat_panel_ptr = new (std::nothrow) ChatPanel(m_splitter_window_ptr);
     if (m_chat_panel_ptr == nullptr) {
-        delete m_sidebar_panel_ptr; // NOLINT(cppcoreguidelines-owning-memory)
-        delete main_sizer_ptr;      // NOLINT(cppcoreguidelines-owning-memory)
+        delete m_sidebar_panel_ptr;  // NOLINT(cppcoreguidelines-owning-memory)
+        delete m_splitter_window_ptr; // NOLINT(cppcoreguidelines-owning-memory)
         return;
     }
 
-    // Fixed: Substituted layout integers with explicit structural weight parameters
-    main_sizer_ptr->Add(m_sidebar_panel_ptr, constants::sidebar_layout_weight, wxEXPAND | wxALL, constants::zero_margin_padding);
-    main_sizer_ptr->Add(m_chat_panel_ptr, constants::chat_layout_weight, wxEXPAND | wxALL, constants::zero_margin_padding);
+    // Configure pane constraint minimum boundaries to prevent collapse clipping zones
+    m_splitter_window_ptr->SetMinimumPaneSize(constants::minimum_pane_size_pixels);
 
-    SetSizer(main_sizer_ptr);
-    Layout();
+    // Bind layout elements horizontally along an adjustable sash interface split layout anchor
+    m_splitter_window_ptr->SplitVertically(m_sidebar_panel_ptr, m_chat_panel_ptr, constants::default_sash_position);
 }
 
 void MainFrame::BindActionEvents() noexcept {
@@ -102,7 +103,7 @@ void MainFrame::OnExitAction([[maybe_unused]] wxCommandEvent &event) {
 void MainFrame::OnAboutAction([[maybe_unused]] wxCommandEvent &event) {
     wxMessageBox(
         "malama Native Local LLM Interface Client\n"
-        "Version 0.0.5\n\n"
+        "Version 0.0.6\n\n"
         "Engineered with C++23 & Native wxWidgets 3.3 for Linux systems.",
         "About malama", 
         wxOK | wxICON_INFORMATION, 
@@ -123,8 +124,16 @@ void MainFrame::OnLicenceAction([[maybe_unused]] wxCommandEvent &event) {
 }
 
 void MainFrame::OnTokenReceived(wxThreadEvent &event) {
-    const auto serialized_token = event.GetString().ToStdString(wxConvUTF8);
-    spdlog::trace("UI Thread received background token segment: {}", serialized_token);
+    // Extract parent reference safely from the routing notification context payload wrapper
+    auto *frame_ptr = wxDynamicCast(event.GetEventObject(), MainFrame);
+    if (frame_ptr == nullptr || frame_ptr->m_chat_panel_ptr == nullptr) {
+        return;
+    }
+
+    const auto raw_token = event.GetString().ToStdString(wxConvUTF8);
+    
+    // Push the string into the live view terminal control
+    frame_ptr->m_chat_panel_ptr->AppendToken(raw_token);
 }
 
 } // namespace malama::ui

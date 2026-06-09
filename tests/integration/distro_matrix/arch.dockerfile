@@ -5,7 +5,7 @@
 # Licence:     Apache-2.0
 # /////////////////////////////////////////////////////////////////////////////
 
-FROM archlinux:multilib-devel-20260531.0.538839
+FROM archlinux:base-20260531.0.538839
 
 # Configure pacman to download concurrently, never time out, and use the exact matching archive day
 RUN sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 5\nDisableDownloadTimeout/' /etc/pacman.conf \

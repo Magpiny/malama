@@ -2,7 +2,7 @@
 // Name:        src/ui/main_frame.hpp
 // Purpose:     Top-level workspace frame containing native menu actions
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-08
+// Created:     2026-06-09
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -13,10 +13,10 @@
 
 #include <cstdint>
 #include <wx/wx.h>
+#include <wx/splitter.h>
 
 namespace malama::ui {
 
-// Forward declare panels to minimize header compile dependencies
 class SidebarPanel;
 class ChatPanel;
 
@@ -25,7 +25,7 @@ wxDECLARE_EVENT(EVT_MALAMA_TOKEN, wxThreadEvent);
 class MainFrame final : public wxFrame {
 public:
     explicit MainFrame(const wxString &title, const wxPoint &pos, const wxSize &size);
-    ~MainFrame() override = default;
+    ~MainFrame()  = default;
 
     MainFrame(const MainFrame &) = delete;
     MainFrame &operator=(const MainFrame &) = delete;
@@ -50,9 +50,10 @@ private:
         LicenceId = wxID_HIGHEST + 1
     };
 
-    // New: Component Panel Pointers
-    SidebarPanel *m_sidebar_panel_ptr{nullptr};
-    ChatPanel *m_chat_panel_ptr{nullptr};
+    // Structural Resizable Layout Component Panes
+    wxSplitterWindow *m_splitter_window_ptr = nullptr;
+    SidebarPanel *m_sidebar_panel_ptr = nullptr;
+    ChatPanel *m_chat_panel_ptr = nullptr;
 };
 
 } // namespace malama::ui

@@ -53,10 +53,10 @@ gtest_discover_tests(test_main_init)
 
 # ---------------------------------------------------------------------------
 # test_network_ui — tests for EVT_MALAMA_TOKEN event type and token handling
-# Requires wxWidgets 3.3 (same version enforced by the PR diff in the root
+# Requires wxWidgets 3.2 (same version enforced by the PR diff in the root
 # CMakeLists.txt).  If wxWidgets is absent the target is skipped gracefully.
 # ---------------------------------------------------------------------------
-find_package(wxWidgets 3.3 QUIET COMPONENTS core base)
+find_package(wxWidgets 3.2 QUIET COMPONENTS core base)
 
 if(wxWidgets_FOUND)
     include(${wxWidgets_USE_FILE})
@@ -89,5 +89,5 @@ if(wxWidgets_FOUND)
     gtest_discover_tests(test_network_ui)
 else()
     message(STATUS
-        "wxWidgets 3.3 not found — skipping test_network_ui build target")
+        "wxWidgets 3.2 not found — skipping test_network_ui build target")
 endif()
