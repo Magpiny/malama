@@ -16,7 +16,10 @@
 
 namespace malama::ui {
 
-// Declare the custom cross-thread token notification event cleanly
+// Forward declare panels to minimize header compile dependencies
+class SidebarPanel;
+class ChatPanel;
+
 wxDECLARE_EVENT(EVT_MALAMA_TOKEN, wxThreadEvent);
 
 class MainFrame final : public wxFrame {
@@ -31,6 +34,7 @@ public:
 
 private:
     void SetupMenuBar() noexcept;
+    void SetupWorkspaceLayout() noexcept;
     void BindActionEvents() noexcept;
 
     // Menu Item Interaction Actions
@@ -38,7 +42,6 @@ private:
     void OnAboutAction([[maybe_unused]] wxCommandEvent &event);
     void OnLicenceAction([[maybe_unused]] wxCommandEvent &event);
 
-    // Thread Notification Consumer - Made static to resolve static analysis metrics
     static void OnTokenReceived(wxThreadEvent &event);
 
     enum class MenuId : std::uint16_t {
@@ -46,6 +49,10 @@ private:
         AboutId = wxID_ABOUT,
         LicenceId = wxID_HIGHEST + 1
     };
+
+    // New: Component Panel Pointers
+    SidebarPanel *m_sidebar_panel_ptr{nullptr};
+    ChatPanel *m_chat_panel_ptr{nullptr};
 };
 
 } // namespace malama::ui

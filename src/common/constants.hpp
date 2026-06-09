@@ -30,4 +30,12 @@ inline constexpr std::size_t default_context_window_limit = 4096;
 // Protocol Handshake Definitions
 inline constexpr unsigned http_version_1_1 = 11;
 
+// New: Layout Workspace Sizing & Proportional Scaling Constants
+inline constexpr int default_margin_padding = 8;
+inline constexpr int zero_margin_padding = 0;
+inline constexpr int layout_proportion_fixed = 0;
+inline constexpr int layout_proportion_stretch = 1;
+inline constexpr int sidebar_layout_weight = 1;
+inline constexpr int chat_layout_weight = 3;
+
 } // namespace malama::constants
