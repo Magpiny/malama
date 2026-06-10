@@ -103,7 +103,7 @@ void MainFrame::OnExitAction([[maybe_unused]] wxCommandEvent &event) {
 void MainFrame::OnAboutAction([[maybe_unused]] wxCommandEvent &event) {
     wxMessageBox(
         "malama Native Local LLM Interface Client\n"
-        "Version 0.0.7\n\n"
+        "Version 0.0.8\n\n"
         "Engineered with C++23 & Native wxWidgets 3.3 for Linux systems.",
         "About malama", 
         wxOK | wxICON_INFORMATION, 
