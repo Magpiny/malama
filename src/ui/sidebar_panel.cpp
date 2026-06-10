@@ -25,8 +25,13 @@ SidebarPanel::SidebarPanel(wxWindow *parent_ptr)
     SetupLayout();
 }
 
+<<<<<<< HEAD
 void SidebarPanel::SetupLayout() noexcept {    
     auto *sizer_ptr = new (std::nothrow) wxBoxSizer(wxVERTICAL); // NOLINT(cppcoreguidelines-owning-memory)
+=======
+void SidebarPanel::SetupLayout() noexcept {
+    auto *sizer_ptr = new (std::nothrow) wxBoxSizer(wxVERTICAL);
+>>>>>>> 9de69a21ca5de4c99f740cd8bd28fe7ff675acb1
     if (sizer_ptr == nullptr) {
         return;
     }
