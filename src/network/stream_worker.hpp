@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/stream_worker.hpp
-// Purpose:     Coordinates non-blocking parallel execution threads via jthread
+// Purpose:     Asynchronous stream coordinator handling chunk fragmentation
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-06
+// Created:     2026-06-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -11,16 +11,21 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "network/i_ollama_client.hpp"
+#include "network/ollama_client.hpp"
+#include "common/types.hpp" // Fixed: Pointed cleanly to our true types mapping file
+
 #include <memory>
-#include <thread>
+#include <string>
+#include <string_view>
+#include <vector>
+#include <functional>
 
 namespace malama::network {
 
 class StreamWorker final {
 public:
-    explicit StreamWorker(std::unique_ptr<IOllamaClient> target_client) noexcept;
-    ~StreamWorker();
+    explicit StreamWorker(std::unique_ptr<OllamaClient> client_ptr) noexcept;
+    ~StreamWorker() = default;
 
     StreamWorker(const StreamWorker &) = delete;
     StreamWorker &operator=(const StreamWorker &) = delete;
@@ -28,18 +33,17 @@ public:
     StreamWorker &operator=(StreamWorker &&) noexcept = default;
 
     auto InitializeGeneration(
-        std::string model_name,
-        std::vector<common::Message> historical_chain,
-        std::move_only_function<void(std::string_view)> on_token_received
+        std::string_view model_name,
+        const std::vector<common::Message> &history_context,
+        std::function<void(std::string_view)> token_callback
     ) noexcept -> void;
 
-    auto TerminateGeneration() noexcept -> void;
-
-    [[nodiscard]] auto IsGenerationActive() const noexcept -> bool;
+    auto IngestRawNetworkBytes(std::string_view incoming_bytes) noexcept -> void;
 
 private:
-    std::unique_ptr<IOllamaClient> m_network_client;
-    std::jthread m_background_thread;
+    std::unique_ptr<OllamaClient> m_client_ptr;
+    std::function<void(std::string_view)> m_token_callback;
+    std::string m_residual_buffer{};
 };
 
 } // namespace malama::network

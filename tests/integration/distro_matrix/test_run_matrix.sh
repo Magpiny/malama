@@ -208,9 +208,9 @@ assert_file_exists \
     "${UBUNTU_DF}"
 
 assert_contains \
-    "ubuntu.dockerfile uses ubuntu:24.04 base image" \
+    "ubuntu.dockerfile uses pinned noble snapshot base image" \
     "${UBUNTU_DF}" \
-    "FROM ubuntu:24.04"
+    "FROM ubuntu:noble-20260509.1"
 
 assert_contains \
     "ubuntu.dockerfile sets DEBIAN_FRONTEND=noninteractive to prevent interactive prompts" \

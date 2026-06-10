@@ -10,7 +10,7 @@ FROM ubuntu:noble-20260509.1
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Synchronize against the locked snapshot repositories
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     git \
