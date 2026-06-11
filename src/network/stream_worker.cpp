@@ -40,7 +40,21 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
         return;
     }
 
-    m_residual_buffer.append(incoming_bytes.data(), incoming_bytes.size());
+    try {
+        const std::size_t allowed = constants::absolute_max_buffer_bytes - m_residual_buffer.size();
+        if (allowed == 0) {
+            spdlog::warn("Residual buffer reached maximum size; clearing buffer to prevent unbounded growth");
+            m_residual_buffer.clear();
+            return;
+        }
+
+        const std::size_t bytes_to_append = std::min(incoming_bytes.size(), allowed);
+        m_residual_buffer.append(incoming_bytes.data(), bytes_to_append);
+    } catch (const std::bad_alloc &) {
+        spdlog::error("Memory allocation failure in IngestRawNetworkBytes; clearing buffer");
+        m_residual_buffer.clear();
+        return;
+    }
 
     std::string_view processing_view(m_residual_buffer);
     std::size_t newline_position = std::string_view::npos;

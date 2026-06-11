@@ -100,10 +100,12 @@ void ChatPanel::OnCopyAction([[maybe_unused]] wxCommandEvent &event) noexcept {
 
     // Access the OS-level clipboard pipeline securely
     if (wxTheClipboard->Open()) {
-        // Framework takes memory ownership of the data object payload upon setting (NOLINT)
         auto *clipboard_data_ptr = new (std::nothrow) wxTextDataObject(m_chat_display_ptr->GetValue()); // NOLINT
         if (clipboard_data_ptr != nullptr) {
-            wxTheClipboard->SetData(clipboard_data_ptr);
+            // SetData returns true on success and takes ownership; if it fails, we must delete
+            if (!wxTheClipboard->SetData(clipboard_data_ptr)) {
+                delete clipboard_data_ptr; // NOLINT
+            }
         }
         wxTheClipboard->Close();
     }
