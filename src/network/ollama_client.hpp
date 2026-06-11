@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_client.hpp
-// Purpose:     Asynchronous Ollama HTTP API interaction engine via Boost.Beast
+// Purpose:     Boost.Asio Native TCP HTTP Client Interface
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-07
+// Created:     2026-06-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -11,30 +11,45 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "network/i_ollama_client.hpp"
+#include "common/constants.hpp"
+
+#include <string>
+#include <string_view>
+#include <functional>
+#include <array>
+#include <thread>
+#include <boost/asio.hpp>
 
 namespace malama::network {
 
-class OllamaClient final : public IOllamaClient {
+class OllamaClient final {
 public:
-    explicit OllamaClient(std::string target_endpoint) noexcept;
-    ~OllamaClient() override = default;
+    explicit OllamaClient(std::string host, std::string port) noexcept;
+    ~OllamaClient() noexcept;
 
     OllamaClient(const OllamaClient &) = delete;
     OllamaClient &operator=(const OllamaClient &) = delete;
+    OllamaClient(OllamaClient &&) noexcept = delete;
+    OllamaClient &operator=(OllamaClient &&) noexcept = delete;
 
-    OllamaClient(OllamaClient &&) noexcept = default;
-    OllamaClient &operator=(OllamaClient &&) noexcept = default;
-
-    [[nodiscard]] auto RequestStream(
-        std::string_view model_name,
-        const std::vector<common::Message> &historical_chain,
-        std::move_only_function<void(std::string_view)> token_callback,
-        std::stop_token cancellation_token
-    ) noexcept -> std::expected<void, common::NetworkError> override;
+    auto SubmitPrompt(std::string_view prompt_text, std::string_view model_name, std::function<void(std::string_view)> on_data) noexcept -> void;
 
 private:
-    std::string m_ollama_endpoint;
+    auto DoResolve() noexcept -> void;
+    auto DoConnect(const boost::asio::ip::tcp::resolver::results_type &endpoints) noexcept -> void;
+    auto DoWrite() noexcept -> void;
+    auto DoRead() noexcept -> void;
+
+    boost::asio::io_context m_io_context;
+    boost::asio::ip::tcp::resolver m_resolver;
+    boost::asio::ip::tcp::socket m_socket;
+    std::jthread m_context_thread;
+
+    std::string m_host;
+    std::string m_port;
+    std::string m_request_buffer;
+    std::array<char, constants::absolute_max_buffer_bytes> m_read_buffer{};
+    std::function<void(std::string_view)> m_on_data_callback;
 };
 
 } // namespace malama::network

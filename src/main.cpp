@@ -33,7 +33,7 @@ public:
 
     [[nodiscard]] bool OnInit() override {
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.0.7 Glaze Streaming Parse Engine...");
+        spdlog::info("Initializing malama v0.0.9 Glaze Streaming Parse Engine...");
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(
             "malama Local UI Engine",
@@ -47,13 +47,15 @@ public:
         frame_ptr->Show(true);
 
         auto client_ptr = std::make_unique<network::OllamaClient>(
-            std::string(constants::default_ollama_endpoint)
+            std::string(constants::default_ollama_host), 
+            std::string(constants::default_ollama_port)
         );
         m_worker_ptr = std::make_unique<network::StreamWorker>(std::move(client_ptr));
 
-        // Connect the interface callback channel to the stream worker
+      // Transmit a live generation request across the native TCP interface
         m_worker_ptr->InitializeGeneration(
-            "qwen2.5-coder",
+            constants::fallback_model_name,
+            "Write a very short, two sentence haiku about C++ performance.",
             std::vector<common::Message>{},
             [frame_ptr](std::string_view parsed_token) mutable {
                 auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
@@ -63,15 +65,8 @@ public:
                     wxQueueEvent(frame_ptr, event_ptr);
                 }
             }
-        );
-
-        // Simulate incoming fragmented JSON chunk strings from a socket
-        m_worker_ptr->IngestRawNetworkBytes("{\"response\":\"# include \",\"done\":false}\n{\"response\":\"<iostream>\\n\\n\",\"done\":false}\n");
-        m_worker_ptr->IngestRawNetworkBytes("{\"response\":\"int \",\"done\":false}\n{\"response\":\"main() \",\"done\":false}\n{\"response\":\"{\\n\",\"done\":false}\n");
-        m_worker_ptr->IngestRawNetworkBytes("{\"response\":\"    std::cout << \\\"Hello \",\"done\":false}\n{\"response\":\"Malama v0.0.7!\\\\n\\\";\\n\",\"done\":false}\n");
-        m_worker_ptr->IngestRawNetworkBytes("{\"response\":\"    return 0;\\n\",\"done\":false}\n{\"response\":\"}\",\"done\":true}\n");
-
-        return true;
+        ); 
+              return true;
     }
 
 private:

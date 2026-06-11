@@ -2,7 +2,7 @@
 // Name:        src/network/stream_worker.hpp
 // Purpose:     Asynchronous stream coordinator handling chunk fragmentation
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-10
+// Created:     2026-06-11
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -12,7 +12,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "network/ollama_client.hpp"
-#include "common/types.hpp" // Fixed: Pointed cleanly to our true types mapping file
+#include "common/types.hpp"
 
 #include <memory>
 #include <string>
@@ -34,6 +34,7 @@ public:
 
     auto InitializeGeneration(
         std::string_view model_name,
+        std::string_view prompt_text,
         const std::vector<common::Message> &history_context,
         std::function<void(std::string_view)> token_callback
     ) noexcept -> void;
