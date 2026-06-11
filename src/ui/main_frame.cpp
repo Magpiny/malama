@@ -33,7 +33,7 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
 }
 
 void MainFrame::SetupMenuBar() noexcept {
-    wxMenuBar *menu_bar_ptr = new (std::nothrow) wxMenuBar(); // NOLINT(cppcoreguidelines-owning-memory)
+    auto *menu_bar_ptr = new (std::nothrow) wxMenuBar(); // NOLINT(cppcoreguidelines-owning-memory)
     if (menu_bar_ptr == nullptr) {
         return;
     }
@@ -103,8 +103,8 @@ void MainFrame::OnExitAction([[maybe_unused]] wxCommandEvent &event) {
 void MainFrame::OnAboutAction([[maybe_unused]] wxCommandEvent &event) {
     wxMessageBox(
         "malama Native Local LLM Interface Client\n"
-        "Version 0.0.6\n\n"
-        "Engineered with C++23 & Native wxWidgets 3.3 for Linux systems.",
+        "Version 0.0.9\n\n"
+        "Engineered with C++23 & Native wxWidgets 3.2.10 for Linux systems.",
         "About malama", 
         wxOK | wxICON_INFORMATION, 
         this

@@ -1,6 +1,6 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/main.cpp
-// Purpose:     Main application entry point for malama native client
+// Purpose:     Main application entry point validating Glaze stream processing
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-09
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
@@ -10,8 +10,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <wx/wx.h>
+#include <wx/weakref.h>
 #include <new>
 #include <string>
+#include <vector>
 #include <spdlog/spdlog.h>
 #include "common/constants.hpp"
 #include "network/ollama_client.hpp"
@@ -32,7 +34,7 @@ public:
 
     [[nodiscard]] bool OnInit() override {
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.0.6 Resizable Splitter Canvas Engine...");
+        spdlog::info("Initializing malama v0.0.9 Glaze Streaming Parse Engine...");
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(
             "malama Local UI Engine",
@@ -46,33 +48,30 @@ public:
         frame_ptr->Show(true);
 
         auto client_ptr = std::make_unique<network::OllamaClient>(
-            std::string(constants::default_ollama_endpoint)
+            std::string(constants::default_ollama_host), 
+            std::string(constants::default_ollama_port)
         );
         m_worker_ptr = std::make_unique<network::StreamWorker>(std::move(client_ptr));
 
-        // Launch a validation stream loop that simulates token generation chunks
+      // Transmit a live generation request across the native TCP interface
+        wxWeakRef<ui::MainFrame> weak_frame_ref(frame_ptr);
         m_worker_ptr->InitializeGeneration(
-            "qwen2.5-coder",
+            constants::fallback_model_name,
+            "Write a very short, two sentence haiku about C++ performance.",
             std::vector<common::Message>{},
-            [frame_ptr](std::string_view token) mutable {
+            [weak_frame_ref](std::string_view parsed_token) mutable {
+                if (!weak_frame_ref) {
+                    return;
+                }
                 auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
                 if (event_ptr != nullptr) {
-                    // Inject a sample string chunk to simulate a live token stream
-                    std::string payload(token);
-                    if (payload.empty() || payload == " ") {
-                        payload = " [token_chunk] ";
-                    }
-                    
-                    event_ptr->SetString(wxString::FromUTF8(payload.data(), payload.size()));
-                    
-                    // Route ownership to allow the static handler to unpack component objects securely
-                    event_ptr->SetEventObject(frame_ptr);
-                    wxQueueEvent(frame_ptr, event_ptr);
+                    event_ptr->SetString(wxString::FromUTF8(parsed_token.data(), parsed_token.size()));
+                    event_ptr->SetEventObject(weak_frame_ref.get());
+                    wxQueueEvent(weak_frame_ref.get(), event_ptr);
                 }
             }
-        );
-
-        return true;
+        ); 
+              return true;
     }
 
 private:

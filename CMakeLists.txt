@@ -1,8 +1,8 @@
 # /////////////////////////////////////////////////////////////////////////////
 # Name:        CMakeLists.txt
 # Purpose:     Root modern target-based compilation build for malama
-# Author:      Wanjare <samuelwanjare@protonmail.com>
-# Created:     2026-06-08
+# Author:      Wanjare <wanjare@magpiny.dev>
+# Created:     2026-06-10
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
 # Licence:     Apache-2.0
 # /////////////////////////////////////////////////////////////////////////////
@@ -10,7 +10,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(malama CXX)
 
-# Enforce policy CMP0167 to suppress modern legacy FindBoost deprecation warnings
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
 endif()
@@ -37,7 +36,6 @@ target_compile_features(malama PUBLIC cxx_std_23)
 
 target_include_directories(malama
     PRIVATE ${CMAKE_SOURCE_DIR}/src
-    PRIVATE ${CMAKE_SOURCE_DIR}/libs
 )
 
 target_compile_options(malama PRIVATE
@@ -58,14 +56,25 @@ find_package(Boost REQUIRED)
 target_link_libraries(malama PRIVATE Boost::boost)
 
 include(FetchContent)
+
+# Provision spdlog framework dependencies (isolated inside build tree)
 FetchContent_Declare(
     spdlog
     GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        v1.14.1
+    GIT_TAG        v1.17.0
     GIT_SHALLOW    TRUE
-    SOURCE_DIR     ${CMAKE_SOURCE_DIR}/libs/spdlog
 )
 FetchContent_MakeAvailable(spdlog)
 target_link_libraries(malama PRIVATE spdlog::spdlog)
 
-add_subdirectory(tests)
+# Provision Glaze JSON parser dependency (isolated inside build tree)
+FetchContent_Declare(
+    glaze
+    GIT_REPOSITORY https://github.com/stephenberry/glaze.git
+    GIT_TAG        v7.8.0
+    GIT_SHALLOW    TRUE
+)
+FetchContent_MakeAvailable(glaze)
+
+# Fixed: Explicitly link against the canonical namespaced header interface target
+target_link_libraries(malama PRIVATE glaze::glaze)

@@ -2,7 +2,7 @@
 // Name:        src/ui/main_frame.hpp
 // Purpose:     Top-level workspace frame containing native menu actions
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-09
+// Created:     2026-06-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -51,9 +51,9 @@ private:
     };
 
     // Structural Resizable Layout Component Panes
-    wxSplitterWindow *m_splitter_window_ptr = nullptr;
-    SidebarPanel *m_sidebar_panel_ptr = nullptr;
-    ChatPanel *m_chat_panel_ptr = nullptr;
+    wxSplitterWindow *m_splitter_window_ptr{nullptr};
+    SidebarPanel *m_sidebar_panel_ptr{nullptr};
+    ChatPanel *m_chat_panel_ptr{nullptr};
 };
 
 } // namespace malama::ui

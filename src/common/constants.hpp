@@ -21,10 +21,13 @@ inline constexpr int default_window_height = 800;
 
 // Internal API & Network Target Anchors
 inline constexpr std::string_view default_ollama_endpoint = "http://localhost:11434";
-inline constexpr std::string_view fallback_model_name = "qwen2.5-coder";
+inline constexpr std::string_view default_ollama_host = "127.0.0.1";
+inline constexpr std::string_view default_ollama_port = "11434";
+inline constexpr std::string_view ollama_generate_path = "/api/generate";
+inline constexpr std::string_view fallback_model_name = "qwen2.5-coder:7b";
 
 // Memory & Processing Constraints
-inline constexpr std::size_t absolute_max_buffer_bytes = 4096;
+inline constexpr std::size_t absolute_max_buffer_bytes = 8192;
 inline constexpr std::size_t default_context_window_limit = 4096;
 
 // Protocol Handshake Definitions
@@ -42,4 +45,11 @@ inline constexpr int chat_layout_weight = 3;
 inline constexpr int default_sash_position = 300;
 inline constexpr int minimum_pane_size_pixels = 200;
 
+// New: UI Theming Palette & Typography
+inline constexpr std::string_view color_earth_brown = "#5C4033";
+inline constexpr std::string_view color_dark_brown = "#3E2723";
+inline constexpr std::string_view color_smoke_white = "#F5F5F5";
+
+// New: Button & Icon Styling Metrics
+inline constexpr int icon_button_margin = 4;
 } // namespace malama::constants

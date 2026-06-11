@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/chat_panel.hpp
 // Purpose:     Primary chat interaction workspace canvas panel
-// Author:      Wanjare <samuelwanjare@protonmail.com>
-// Created:     2026-06-08
+// Author:      Wanjare <wanjare@magpiny.dev>
+// Created:     2026-06-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -13,6 +13,8 @@
 
 #include <wx/panel.h>
 #include <wx/textctrl.h>
+#include <wx/button.h>
+#include <string_view>
 
 namespace malama::ui {
 
@@ -26,13 +28,17 @@ public:
     ChatPanel(ChatPanel &&) noexcept = delete;
     ChatPanel &operator=(ChatPanel &&) noexcept = delete;
 
-    // Expose non-throwing token stream consumer link
     auto AppendToken(std::string_view token_segment) noexcept -> void;
 
 private:
     void SetupLayout() noexcept;
+    void BindEvents() noexcept;
 
-    wxTextCtrl *m_chat_display_ptr = nullptr;
+    // Clipboard event handler
+    void OnCopyAction(wxCommandEvent &event) noexcept;
+
+    wxTextCtrl *m_chat_display_ptr{nullptr};
+    wxButton *m_copy_button_ptr{nullptr};
 };
 
 } // namespace malama::ui
