@@ -33,13 +33,13 @@ public:
     OllamaClient(OllamaClient &&) noexcept = delete;
     OllamaClient &operator=(OllamaClient &&) noexcept = delete;
 
-    auto SubmitPrompt(std::string_view prompt_text, std::string_view model_name, std::function<void(std::string_view)> on_data) -> void;
+    auto SubmitPrompt(std::string_view prompt_text, std::string_view model_name, std::function<void(std::string_view)> on_data) noexcept -> void;
 
 private:
-    auto DoResolve() -> void;
-    auto DoConnect(const boost::asio::ip::tcp::resolver::results_type &endpoints) -> void;
-    auto DoWrite() -> void;
-    auto DoRead() -> void;
+    auto DoResolve() noexcept -> void;
+    auto DoConnect(const boost::asio::ip::tcp::resolver::results_type &endpoints) noexcept -> void;
+    auto DoWrite() noexcept -> void;
+    auto DoRead() noexcept -> void;
 
     boost::asio::io_context m_io_context;
     boost::asio::ip::tcp::resolver m_resolver;

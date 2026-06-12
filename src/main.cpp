@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/main.cpp
-// Purpose:     Main application entry point validating Glaze stream processing
+// Purpose:     Main application entry point for malama native client
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-09
+// Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -10,7 +10,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <wx/wx.h>
-#include <wx/weakref.h>
 #include <new>
 #include <string>
 #include <vector>
@@ -34,47 +33,67 @@ public:
 
     [[nodiscard]] bool OnInit() override {
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.0.9 Glaze Streaming Parse Engine...");
+        spdlog::info("Initializing malama v0.1.0 MVP Interactivity Engine...\n");
+
+        Bind(ui::EVT_MALAMA_TOKEN, &MalamaApp::OnTokenReceived, this);
+
+        auto *raw_client_ptr = new (std::nothrow) network::OllamaClient(
+            std::string(constants::default_ollama_host), 
+            std::string(constants::default_ollama_port)
+        );
+        if (raw_client_ptr == nullptr) {return false;}
+        std::unique_ptr<network::OllamaClient> client_ptr(raw_client_ptr);
+
+        auto *raw_worker_ptr = new (std::nothrow) network::StreamWorker(std::move(client_ptr));
+        if (raw_worker_ptr == nullptr) {return false;}
+        m_worker_ptr.reset(raw_worker_ptr);
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(
             "malama Local UI Engine",
             wxDefaultPosition, 
-            wxSize(constants::default_window_width, constants::default_window_height)
+            wxSize(constants::default_window_width, constants::default_window_height),
+            
+            // LINTER FIXED: Passed by const reference to avoid deep copying strings on the heap
+            [this](const std::string& user_prompt) mutable {
+                
+                auto *current_frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
+                if (current_frame_ptr != nullptr) {
+                    current_frame_ptr->AppendUserMessage(user_prompt);
+                }
+
+                if (m_worker_ptr != nullptr) {
+                    m_worker_ptr->InitializeGeneration(
+                        constants::fallback_model_name,
+                        user_prompt,
+                        std::vector<common::Message>{},
+                        [](std::string_view parsed_token) mutable {
+                            auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
+                            if (event_ptr != nullptr) {
+                                event_ptr->SetString(wxString::FromUTF8(parsed_token.data(), parsed_token.size()));
+                                wxQueueEvent(wxTheApp, event_ptr);
+                            }
+                        }
+                    );
+                }
+            }
         );
+
         if (frame_ptr == nullptr) {
             return false;
         }
         
         frame_ptr->Show(true);
-
-        auto client_ptr = std::make_unique<network::OllamaClient>(
-            std::string(constants::default_ollama_host), 
-            std::string(constants::default_ollama_port)
-        );
-        m_worker_ptr = std::make_unique<network::StreamWorker>(std::move(client_ptr));
-
-      // Transmit a live generation request across the native TCP interface
-        wxWeakRef<ui::MainFrame> weak_frame_ref(frame_ptr);
-        m_worker_ptr->InitializeGeneration(
-            constants::fallback_model_name,
-            "Write a very brief introduction to C++.",
-            std::vector<common::Message>{},
-            [weak_frame_ref](std::string_view parsed_token) mutable {
-                if (!weak_frame_ref) {
-                    return;
-                }
-                auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
-                if (event_ptr != nullptr) {
-                    event_ptr->SetString(wxString::FromUTF8(parsed_token.data(), parsed_token.size()));
-                    event_ptr->SetEventObject(weak_frame_ref.get());
-                    wxQueueEvent(weak_frame_ref.get(), event_ptr);
-                }
-            }
-        ); 
-              return true;
+        return true;
     }
 
 private:
+    void OnTokenReceived(wxThreadEvent& event) {
+        auto* frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
+        if (frame_ptr != nullptr) {
+            frame_ptr->AppendToken(event.GetString().ToStdString(wxConvUTF8));
+        }
+    }
+
     std::unique_ptr<network::StreamWorker> m_worker_ptr;
 };
 

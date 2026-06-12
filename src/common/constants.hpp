@@ -45,11 +45,17 @@ inline constexpr int chat_layout_weight = 3;
 inline constexpr int default_sash_position = 300;
 inline constexpr int minimum_pane_size_pixels = 200;
 
-// New: UI Theming Palette & Typography
+// UI Theming Palette & Typography
 inline constexpr std::string_view color_earth_brown = "#5C4033";
 inline constexpr std::string_view color_dark_brown = "#3E2723";
 inline constexpr std::string_view color_smoke_white = "#F5F5F5";
 
-// New: Button & Icon Styling Metrics
+// Button & Icon Styling Metrics
 inline constexpr int icon_button_margin = 4;
+
+// Asynchronous Network Timeout Thresholds
+inline constexpr int NETWORK_RESOLVE_TIMEOUT_SEC = 10;
+inline constexpr int NETWORK_CONNECT_TIMEOUT_SEC = 10;
+inline constexpr int NETWORK_WRITE_TIMEOUT_SEC = 30;
+inline constexpr int NETWORK_READ_TIMEOUT_SEC = 60;
 } // namespace malama::constants
