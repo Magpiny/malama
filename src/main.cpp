@@ -55,7 +55,7 @@ public:
       // Transmit a live generation request across the native TCP interface
         m_worker_ptr->InitializeGeneration(
             constants::fallback_model_name,
-            "Write a very short, two sentence haiku about C++ performance.",
+            "Write a very brief introduction to C++.",
             std::vector<common::Message>{},
             [frame_ptr](std::string_view parsed_token) mutable {
                 auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
