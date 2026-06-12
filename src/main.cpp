@@ -10,6 +10,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <wx/wx.h>
+#include <wx/weakref.h>
 #include <new>
 #include <string>
 #include <vector>
@@ -53,16 +54,20 @@ public:
         m_worker_ptr = std::make_unique<network::StreamWorker>(std::move(client_ptr));
 
       // Transmit a live generation request across the native TCP interface
+        wxWeakRef<ui::MainFrame> weak_frame_ref(frame_ptr);
         m_worker_ptr->InitializeGeneration(
             constants::fallback_model_name,
             "Write a very brief introduction to C++.",
             std::vector<common::Message>{},
-            [frame_ptr](std::string_view parsed_token) mutable {
+            [weak_frame_ref](std::string_view parsed_token) mutable {
+                if (!weak_frame_ref) {
+                    return;
+                }
                 auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
                 if (event_ptr != nullptr) {
                     event_ptr->SetString(wxString::FromUTF8(parsed_token.data(), parsed_token.size()));
-                    event_ptr->SetEventObject(frame_ptr);
-                    wxQueueEvent(frame_ptr, event_ptr);
+                    event_ptr->SetEventObject(weak_frame_ref.get());
+                    wxQueueEvent(weak_frame_ref.get(), event_ptr);
                 }
             }
         ); 
