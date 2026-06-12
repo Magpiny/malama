@@ -29,6 +29,7 @@ See **malama** v0.1.0 in action:
   Your browser does not support the video tag.
 </video>
 
+[Watch the malama v0.1.0 introduction](assets/malama_v0.1.0mvp.mp4)
 ---
 
 ## 🏗 Architecture & Engineering
