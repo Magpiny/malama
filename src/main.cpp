@@ -52,10 +52,8 @@ public:
             "malama Local UI Engine",
             wxDefaultPosition, 
             wxSize(constants::default_window_width, constants::default_window_height),
-            
-            // LINTER FIXED: Passed by const reference to avoid deep copying strings on the heap
             [this](const std::string& user_prompt) mutable {
-                
+
                 auto *current_frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
                 if (current_frame_ptr != nullptr) {
                     current_frame_ptr->AppendUserMessage(user_prompt);
@@ -81,7 +79,7 @@ public:
         if (frame_ptr == nullptr) {
             return false;
         }
-        
+
         frame_ptr->Show(true);
         return true;
     }
