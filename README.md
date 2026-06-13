@@ -1,6 +1,6 @@
-# malama
+# Malama
 
-**malama** is a high-performance, local-first LLM interface designed for engineers and minimalists. Built from the ground up using native C++23 and wxWidgets, it provides a lightning-fast, resource-efficient experience for interacting with local language models, ensuring your development environment stays lightweight and responsive.
+> Native Linux chat client for local LLMs — no cloud, no browser, no compromise.
 
 [![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](#)
