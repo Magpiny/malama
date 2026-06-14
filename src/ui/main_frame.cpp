@@ -40,13 +40,13 @@ MainFrame::MainFrame(
 
 auto MainFrame::AppendUserMessage(std::string_view message) noexcept -> void {
     if (m_chat_panel_ptr != nullptr) {
-        m_chat_panel_ptr->AppendUserMessage(message);
+        m_chat_panel_ptr->append_user_message(message);
     }
 }
 
 auto MainFrame::AppendToken(std::string_view token_segment) noexcept -> void {
     if (m_chat_panel_ptr != nullptr) {
-        m_chat_panel_ptr->AppendToken(token_segment);
+        m_chat_panel_ptr->append_token(token_segment);
     }
 }
 
