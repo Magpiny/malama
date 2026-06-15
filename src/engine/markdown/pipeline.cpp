@@ -9,7 +9,6 @@
 
 #include "engine/markdown/pipeline.hpp"
 #include <string>
-#include <sstream>
 #include <regex>
 #include <utility>
 
@@ -23,20 +22,78 @@ auto Pipeline::process(std::string_view raw_markdown) const -> std::string {
     return emit(tokens);
 }
 
-auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
-    std::vector<Token> tokens;
-    std::string current_buffer;
-    std::string_view remaining = text;
-    bool in_code_block = false;
-    std::string code_lang;
+struct TokenizeState {
+    std::vector<Token> m_tokens;
+    std::string m_current_buffer;
+    std::string m_code_lang;
+    bool m_in_code_block{false};
 
-    auto push_buffer_as = [&](token_type type) {
-        if (!current_buffer.empty()) {
-            tokens.push_back({.m_type=type, .m_content=current_buffer, .m_language=code_lang});
-            current_buffer.clear();
-            code_lang.clear();
+    void push_buffer_as(token_type type) {
+        if (!m_current_buffer.empty()) {
+            m_tokens.push_back({.m_type = type, .m_content = m_current_buffer, .m_language = m_code_lang});
+            m_current_buffer.clear();
+            m_code_lang.clear();
         }
-    };
+    }
+};
+
+static auto process_markdown_line(std::string_view line, TokenizeState& state) -> void {
+    // Guard Clause 1: Handle code block toggles immediately
+    if (line.starts_with("```")) {
+        if (state.m_in_code_block) {
+            state.push_buffer_as(token_type::code_block);
+            state.m_in_code_block = false;
+        } else {
+            state.push_buffer_as(token_type::paragraph);
+            state.m_in_code_block = true;
+            state.m_code_lang = std::string(line.substr(3));
+        }
+        return; // Early return flattens complexity
+    } 
+    
+    // Guard Clause 2: If we are inside a code block, append and exit
+    if (state.m_in_code_block) {
+        state.m_current_buffer += std::string(line) + "\n";
+        return; 
+    } 
+    
+    // Standard Markdown processing (Flat if/else chain)
+    if (line.starts_with("### ")) {
+        state.push_buffer_as(token_type::paragraph);
+        state.m_current_buffer = line.substr(4);
+        state.push_buffer_as(token_type::header_3);
+    } else if (line.starts_with("## ")) {
+        state.push_buffer_as(token_type::paragraph);
+        state.m_current_buffer = line.substr(3);
+        state.push_buffer_as(token_type::header_2);
+    } else if (line.starts_with("# ")) {
+        state.push_buffer_as(token_type::paragraph);
+        state.m_current_buffer = line.substr(2);
+        state.push_buffer_as(token_type::header_1);
+    } else if (line.starts_with("---")) {
+        state.push_buffer_as(token_type::paragraph);
+        state.push_buffer_as(token_type::divider);
+    } else if (line.starts_with("* ") || line.starts_with("- ")) {
+        state.push_buffer_as(token_type::paragraph); 
+        state.m_current_buffer = line.substr(2);
+        state.push_buffer_as(token_type::list_unordered);
+    } else if (std::regex_search(std::string(line), std::regex(R"(^\d+\.\s)"))) {
+        state.push_buffer_as(token_type::paragraph);
+        size_t dot_pos = line.find('.');
+        state.m_current_buffer = line.substr(dot_pos + 2);
+        state.push_buffer_as(token_type::list_ordered);
+    } else {
+        if (line.empty()) {
+            state.m_current_buffer += "<br>";
+        } else {
+            state.m_current_buffer += std::string(line) + " ";
+        }
+    }
+}
+
+auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
+    TokenizeState state;
+    std::string_view remaining = text;
 
     while (!remaining.empty()) {
         size_t newline_pos = remaining.find('\n');
@@ -53,51 +110,12 @@ auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
             remaining.remove_prefix(newline_pos + 1);
         }
 
-        if (line.starts_with("```")) {
-            if (in_code_block) {
-                push_buffer_as(token_type::code_block);
-                in_code_block = false;
-            } else {
-                push_buffer_as(token_type::paragraph);
-                in_code_block = true;
-                code_lang = std::string(line.substr(3));
-            }
-        } else if (in_code_block) {
-            current_buffer += std::string(line) + "\n";
-        } else if (line.starts_with("### ")) {
-            push_buffer_as(token_type::paragraph);
-            current_buffer = line.substr(4);
-            push_buffer_as(token_type::header_3);
-        } else if (line.starts_with("## ")) {
-            push_buffer_as(token_type::paragraph);
-            current_buffer = line.substr(3);
-            push_buffer_as(token_type::header_2);
-        } else if (line.starts_with("# ")) {
-            push_buffer_as(token_type::paragraph);
-            current_buffer = line.substr(2);
-            push_buffer_as(token_type::header_1);
-        } else if (line.starts_with("---")) {
-            push_buffer_as(token_type::paragraph);
-            push_buffer_as(token_type::divider);
-        } else if (line.starts_with("* ") || line.starts_with("- ")) {
-            push_buffer_as(token_type::paragraph); 
-            current_buffer = line.substr(2);
-            push_buffer_as(token_type::list_unordered);
-        } else if (std::regex_search(std::string(line), std::regex(R"(^\d+\.\s)"))) {
-            push_buffer_as(token_type::paragraph);
-            size_t dot_pos = line.find('.');
-            current_buffer = line.substr(dot_pos + 2);
-            push_buffer_as(token_type::list_ordered);
-        } else {
-            if (line.empty()) {
-                current_buffer += "<br>";
-            } else {
-                current_buffer += std::string(line) + " ";
-            }
-        }
+        // Delegate logic to our low-complexity handler
+        process_markdown_line(line, state);
     }
-    push_buffer_as(token_type::paragraph);
-    return tokens;
+    
+    state.push_buffer_as(token_type::paragraph);
+    return state.m_tokens;
 }
 
 auto Pipeline::decorate_inline_text(std::string_view text) const -> std::string {
@@ -119,25 +137,43 @@ auto Pipeline::decorate_code_block(std::string_view code) const -> std::string {
     // 1. Strip trailing carriage returns natively
     std::erase(processed, '\r');
 
-    // 2. Encode HTML entities to prevent rendering breaks
+    // 2. Encode HTML entities FIRST so we don't break wxHtmlWindow
     processed = std::regex_replace(processed, std::regex("&"), "&amp;");
     processed = std::regex_replace(processed, std::regex("<"), "&lt;");
     processed = std::regex_replace(processed, std::regex(">"), "&gt;");
 
-    // 3. Highlight Syntax
-    std::regex keyword_rx(R"(\b(def|class|return|if|else|elif|for|while|import|from|int|void|auto|const|std|cout|endl|string|vector|namespace|public|private|protected)\b)");
-    std::regex preproc_rx(R"((#\s*[a-zA-Z]+))");
+    // 3. Highlight Syntax using Control Character Markers (Prevents Regex Collisions)
     std::regex string_rx(R"((\"[^\"]*\"))");
     std::regex comment_rx(R"((//.*))");
+    std::regex preproc_rx(R"((#\s*[a-zA-Z]+))");
+    std::regex keyword_rx(R"(\b(def|class|return|if|else|elif|for|while|import|from|int|void|auto|const|std|cout|endl|string|vector|namespace|public|private|protected)\b)");
 
-    processed = std::regex_replace(processed, preproc_rx, "<font color=\"" + m_theme.m_code_keyword + "\">$1</font>");
-    processed = std::regex_replace(processed, keyword_rx, "<font color=\"" + m_theme.m_code_keyword + "\">$1</font>");
-    processed = std::regex_replace(processed, string_rx, "<font color=\"" + m_theme.m_code_string + "\">$1</font>");
-    processed = std::regex_replace(processed, comment_rx, "<font color=\"" + m_theme.m_code_comment + "\">$1</font>");
+    processed = std::regex_replace(processed, string_rx, "\x01$1\x02");
+    processed = std::regex_replace(processed, comment_rx, "\x03$1\x04");
+    processed = std::regex_replace(processed, preproc_rx, "\x05$1\x06");
+    processed = std::regex_replace(processed, keyword_rx, "\x07$1\x08");
 
-    // 4. Wrap in <pre> tag inside a simple background table. <pre> handles newlines natively!
+    // 4. Explicitly handle formatting so wxHtmlWindow doesn't compress it into a straight line
+    processed = std::regex_replace(processed, std::regex("\n"), "<br>");
+    processed = std::regex_replace(processed, std::regex("\t"), "&nbsp;&nbsp;&nbsp;&nbsp;");
+    processed = std::regex_replace(processed, std::regex("  "), "&nbsp;&nbsp;"); // Preserves indentation
+
+    // 5. Expand markers safely into final HTML tags
+    processed = std::regex_replace(processed, std::regex("\x01"), "<font color=\"" + m_theme.m_code_string + "\">");
+    processed = std::regex_replace(processed, std::regex("\x02"), "</font>");
+    
+    processed = std::regex_replace(processed, std::regex("\x03"), "<font color=\"" + m_theme.m_code_comment + "\">");
+    processed = std::regex_replace(processed, std::regex("\x04"), "</font>");
+    
+    processed = std::regex_replace(processed, std::regex("\x05"), "<font color=\"" + m_theme.m_code_keyword + "\">");
+    processed = std::regex_replace(processed, std::regex("\x06"), "</font>");
+    
+    processed = std::regex_replace(processed, std::regex("\x07"), "<font color=\"" + m_theme.m_code_keyword + "\">");
+    processed = std::regex_replace(processed, std::regex("\x08"), "</font>");
+
+    // 6. Wrap in a table background (Dropping the buggy <pre> tag)
     return R"(<br><table width="100%" bgcolor=")" + m_theme.m_code_bg + "\" cellpadding=\"10\">"
-           "<tr><td><pre><font color=\"" + m_theme.m_text_primary + "\">" + processed + "</font></pre></td></tr>"
+           "<tr><td valign=\"top\"><font color=\"" + m_theme.m_text_primary + R"(" face="monospace">)" + processed + "</font></td></tr>"
            "</table><br>";
 }
 

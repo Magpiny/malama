@@ -2,7 +2,7 @@
 // Name:        src/ui/main_frame.cpp
 // Purpose:     Implements top-level window controls and menu modal dialog loops
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-12
+// Created:     2026-06-15
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -12,6 +12,7 @@
 #include "ui/main_frame.hpp"
 #include "ui/sidebar_panel.hpp"
 #include "ui/chat_panel.hpp"
+#include "ui/settings_dialog.hpp" // NEW: Required to instantiate the dialog
 #include "common/constants.hpp"
 
 #include <new>
@@ -56,6 +57,10 @@ void MainFrame::SetupMenuBar() noexcept {
 
     auto *file_menu_ptr = new (std::nothrow) wxMenu(); // NOLINT
     if (file_menu_ptr == nullptr) { delete menu_bar_ptr; return; } // NOLINT
+    
+    // NEW: Added Settings menu item and separator before Exit
+    file_menu_ptr->Append(static_cast<int>(MenuId::PreferencesId), "Settings...\tCtrl+,", "Configure malama settings");
+    file_menu_ptr->AppendSeparator();
     file_menu_ptr->Append(static_cast<int>(MenuId::ExitId), "E&xit\tAlt-X", "Terminate application framework");
     menu_bar_ptr->Append(file_menu_ptr, "&File");
 
@@ -99,20 +104,29 @@ void MainFrame::SetupWorkspaceLayout() noexcept {
 }
 
 void MainFrame::BindActionEvents() noexcept {
+    // NEW: Bound the Preferences Action
+    Bind(wxEVT_MENU, &MainFrame::OnPreferencesAction, this, static_cast<int>(MenuId::PreferencesId));
+    
     Bind(wxEVT_MENU, &MainFrame::OnExitAction, this, static_cast<int>(MenuId::ExitId));
     Bind(wxEVT_MENU, &MainFrame::OnAboutAction, this, static_cast<int>(MenuId::AboutId));
     Bind(wxEVT_MENU, &MainFrame::OnLicenceAction, this, static_cast<int>(MenuId::LicenceId));
     Bind(EVT_USER_PROMPT, &MainFrame::OnUserPromptSubmitted, this);
 }
 
-void MainFrame::OnExitAction([[maybe_unused]] wxCommandEvent &event) {
+// NEW: Implementation for spawning the Settings Dialog
+void MainFrame::OnPreferencesAction([[maybe_unused]] wxCommandEvent &event) noexcept {
+    SettingsDialog dialog(this);
+    dialog.ShowModal();
+}
+
+void MainFrame::OnExitAction([[maybe_unused]] wxCommandEvent &event) noexcept {
     Close(true);
 }
 
-void MainFrame::OnAboutAction([[maybe_unused]] wxCommandEvent &event) {
+void MainFrame::OnAboutAction([[maybe_unused]] wxCommandEvent &event) noexcept {
     wxMessageBox(
         "malama Native Local LLM Interface Client\n"
-        "Version 0.1.0 (MVP)\n\n"
+        "Version 0.1.1 (MVP)\n\n"
         "Engineered with C++23 & Native wxWidgets 3.3 for Linux systems.",
         "About malama", 
         wxOK | wxICON_INFORMATION, 
@@ -120,7 +134,7 @@ void MainFrame::OnAboutAction([[maybe_unused]] wxCommandEvent &event) {
     );
 }
 
-void MainFrame::OnLicenceAction([[maybe_unused]] wxCommandEvent &event) {
+void MainFrame::OnLicenceAction([[maybe_unused]] wxCommandEvent &event) noexcept {
     wxMessageBox(
         "Licensed under the Apache License, Version 2.0\n",
         "Licence Constraints", 
