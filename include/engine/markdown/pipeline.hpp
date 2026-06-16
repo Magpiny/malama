@@ -4,8 +4,8 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <utility>
 #include "config/config_manager.hpp"
+#include "engine/markdown/syntax_registry.hpp"
 
 namespace malama::engine::markdown {
 
@@ -38,13 +38,14 @@ private:
     [[nodiscard]] static auto tokenize(std::string_view text) -> std::vector<Token>;
     
     // Stage 2: Styler & Syntax Highlighter
-    [[nodiscard]] auto decorate_code_block(std::string_view code) const -> std::string;
+    [[nodiscard]] auto decorate_code_block(std::string_view code, const std::string& lang) const -> std::string;
     [[nodiscard]] auto decorate_inline_text(std::string_view text) const -> std::string;
     
     // Stage 3: Painter
     [[nodiscard]] auto emit(const std::vector<Token>& tokens) const -> std::string;
 
     config::AppearanceConfig m_theme;
+    SyntaxRegistry m_registry;
 };
 
 } // namespace malama::engine::markdown

@@ -33,6 +33,7 @@ add_executable(malama
     src/ui/settings_dialog.cpp
     src/config/config_manager.cpp
     src/engine/markdown/pipeline.cpp
+    src/engine/markdown/syntax_registry.cpp
 )
 
 # -----------------------------------------------------------------------------

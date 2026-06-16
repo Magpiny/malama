@@ -48,7 +48,7 @@ static auto process_markdown_line(std::string_view line, TokenizeState& state) -
             state.m_in_code_block = true;
             state.m_code_lang = std::string(line.substr(3));
         }
-        return; // Early return flattens complexity
+        return;
     } 
     
     // Guard Clause 2: If we are inside a code block, append and exit
@@ -110,7 +110,6 @@ auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
             remaining.remove_prefix(newline_pos + 1);
         }
 
-        // Delegate logic to our low-complexity handler
         process_markdown_line(line, state);
     }
     
@@ -131,47 +130,54 @@ auto Pipeline::decorate_inline_text(std::string_view text) const -> std::string 
     return processed;
 }
 
-auto Pipeline::decorate_code_block(std::string_view code) const -> std::string {
+auto Pipeline::decorate_code_block(std::string_view code, const std::string& lang) const -> std::string {
     std::string processed{code};
-
-    // 1. Strip trailing carriage returns natively
     std::erase(processed, '\r');
 
-    // 2. Encode HTML entities FIRST so we don't break wxHtmlWindow
+    // 1. Encode HTML entities FIRST
     processed = std::regex_replace(processed, std::regex("&"), "&amp;");
     processed = std::regex_replace(processed, std::regex("<"), "&lt;");
     processed = std::regex_replace(processed, std::regex(">"), "&gt;");
 
-    // 3. Highlight Syntax using Control Character Markers (Prevents Regex Collisions)
-    std::regex string_rx(R"((\"[^\"]*\"))");
-    std::regex comment_rx(R"((//.*))");
-    std::regex preproc_rx(R"((#\s*[a-zA-Z]+))");
-    std::regex keyword_rx(R"(\b(def|class|return|if|else|elif|for|while|import|from|int|void|auto|const|std|cout|endl|string|vector|namespace|public|private|protected)\b)");
+    // 2. Apply Dynamic Grammar Rules
+    const auto* syntax = m_registry.GetSyntaxFor(lang);
+    if (syntax != nullptr) {
+        for (const auto& rule : syntax->m_rules) {
+            processed = std::regex_replace(processed, rule.m_pattern, rule.m_replacement);
+        }
+    }
 
-    processed = std::regex_replace(processed, string_rx, "\x01$1\x02");
-    processed = std::regex_replace(processed, comment_rx, "\x03$1\x04");
-    processed = std::regex_replace(processed, preproc_rx, "\x05$1\x06");
-    processed = std::regex_replace(processed, keyword_rx, "\x07$1\x08");
-
-    // 4. Explicitly handle formatting so wxHtmlWindow doesn't compress it into a straight line
+    // 3. Format Spacing for wxHtmlWindow
     processed = std::regex_replace(processed, std::regex("\n"), "<br>");
     processed = std::regex_replace(processed, std::regex("\t"), "&nbsp;&nbsp;&nbsp;&nbsp;");
-    processed = std::regex_replace(processed, std::regex("  "), "&nbsp;&nbsp;"); // Preserves indentation
+    processed = std::regex_replace(processed, std::regex("  "), "&nbsp;&nbsp;");
 
-    // 5. Expand markers safely into final HTML tags
+    // 4. Expand Control Markers to Colors
+    // Standard Theme Colors
     processed = std::regex_replace(processed, std::regex("\x01"), "<font color=\"" + m_theme.m_code_string + "\">");
     processed = std::regex_replace(processed, std::regex("\x02"), "</font>");
-    
     processed = std::regex_replace(processed, std::regex("\x03"), "<font color=\"" + m_theme.m_code_comment + "\">");
     processed = std::regex_replace(processed, std::regex("\x04"), "</font>");
-    
     processed = std::regex_replace(processed, std::regex("\x05"), "<font color=\"" + m_theme.m_code_keyword + "\">");
     processed = std::regex_replace(processed, std::regex("\x06"), "</font>");
-    
-    processed = std::regex_replace(processed, std::regex("\x07"), "<font color=\"" + m_theme.m_code_keyword + "\">");
-    processed = std::regex_replace(processed, std::regex("\x08"), "</font>");
 
-    // 6. Wrap in a table background (Dropping the buggy <pre> tag)
+    // Custom Specific Semantic Colors
+    // Entity (Classes, Enums, Funcs) -> Yellow
+    processed = std::regex_replace(processed, std::regex("\x07"), "<font color=\"#E5C07B\">"); 
+    processed = std::regex_replace(processed, std::regex("\x08"), "</font>");
+    
+    // Punctuation (Braces) -> Orange
+    processed = std::regex_replace(processed, std::regex("\x09"), "<font color=\"#D19A66\">"); 
+    processed = std::regex_replace(processed, std::regex("\x0A"), "</font>");
+    
+    // Headers/Includes -> Green
+    processed = std::regex_replace(processed, std::regex("\x0B"), "<font color=\"#98C379\">"); 
+    processed = std::regex_replace(processed, std::regex("\x0C"), "</font>");
+    
+    // Methods (namespace::class::method) -> Dark Green
+    processed = std::regex_replace(processed, std::regex("\x0D"), "<font color=\"#43A047\">"); 
+    processed = std::regex_replace(processed, std::regex("\x0E"), "</font>");
+
     return R"(<br><table width="100%" bgcolor=")" + m_theme.m_code_bg + "\" cellpadding=\"10\">"
            "<tr><td valign=\"top\"><font color=\"" + m_theme.m_text_primary + R"(" face="monospace">)" + processed + "</font></td></tr>"
            "</table><br>";
@@ -214,7 +220,7 @@ auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
                 html_output += "<li>" + decorate_inline_text(tok.m_content) + "</li>";
                 break;
             case token_type::code_block:
-                html_output += decorate_code_block(tok.m_content);
+                html_output += decorate_code_block(tok.m_content,tok.m_language);
                 break;
             case token_type::paragraph:
             default:
