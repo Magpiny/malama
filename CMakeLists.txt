@@ -30,7 +30,17 @@ add_executable(malama
     src/ui/main_frame.cpp
     src/ui/sidebar_panel.cpp
     src/ui/chat_panel.cpp
+    src/ui/settings_dialog.cpp
+    src/config/config_manager.cpp
+    src/engine/markdown/pipeline.cpp
+    src/engine/markdown/syntax_registry.cpp
 )
+
+# -----------------------------------------------------------------------------
+# 3. SET INCLUDE DIRECTORIES
+# This tells the compiler where to look when you say #include "config/..."
+# -----------------------------------------------------------------------------
+target_include_directories(malama PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 target_compile_features(malama PUBLIC cxx_std_23)
 
@@ -47,7 +57,7 @@ target_compile_options(malama PRIVATE
 )
 
 # Extract native UI components
-find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base)
+find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 

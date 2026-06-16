@@ -9,8 +9,6 @@
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
-
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -44,25 +42,30 @@ public:
     auto AppendToken(std::string_view token_segment) noexcept -> void;
 
 private:
-    void SetupMenuBar() noexcept;
+    // Core Layout & Bindings
     void SetupWorkspaceLayout() noexcept;
     void BindActionEvents() noexcept;
+    void SetupMenuBar() noexcept; // Merged with setup_menu()
 
-    void OnExitAction([[maybe_unused]] wxCommandEvent &event);
-    void OnAboutAction([[maybe_unused]] wxCommandEvent &event);
-    void OnLicenceAction([[maybe_unused]] wxCommandEvent &event);
+    // Event Handlers (
+    void OnPreferencesAction(wxCommandEvent &event) noexcept; // Renamed from on_preferences
+    void OnExitAction([[maybe_unused]] wxCommandEvent &event) noexcept;
+    void OnAboutAction([[maybe_unused]] wxCommandEvent &event) noexcept;
+    void OnLicenceAction([[maybe_unused]] wxCommandEvent &event) noexcept;
     void OnUserPromptSubmitted(wxCommandEvent &event) noexcept;
 
+    // TitleCase for Enums
     enum class MenuId : std::uint16_t {
+        PreferencesId = wxID_PREFERENCES, // Added the standard preference ID
         ExitId = wxID_EXIT,
         AboutId = wxID_ABOUT,
         LicenceId = wxID_HIGHEST + 1
     };
 
-    wxSplitterWindow *m_splitter_window_ptr = nullptr;
+    wxSplitterWindow *m_splitter_window_ptr{nullptr};
     SidebarPanel *m_sidebar_panel_ptr{nullptr};
-    ChatPanel *m_chat_panel_ptr = nullptr;
-    
+    ChatPanel *m_chat_panel_ptr{nullptr};
+
     std::function<void(const std::string&)> m_on_prompt_submit_callback;
 };
 
