@@ -159,4 +159,21 @@ void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
     }
 }
 
+void ChatPanel::load_history(const core::ChatSession& session) noexcept {
+    // 1. Clear the chat window (Assuming you have access to the html window here)
+    if (m_html_window_ptr != nullptr) {
+        m_html_window_ptr->SetPage(""); 
+    }
+    
+    // 2. Loop through history and reuse your existing pipeline!
+    for (const auto& msg : session.m_messages) {
+        if (msg.m_role == core::MessageRole::User) {
+            append_user_message(msg.m_content);
+        } else {
+            // Re-use your token appender to format the assistant response
+            append_token(msg.m_content); 
+        }
+    }
+}
+
 } // namespace malama::ui

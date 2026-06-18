@@ -14,7 +14,11 @@
 #include <string_view>
 #include <functional>
 #include <wx/wx.h>
+#include <wx/stdpaths.h>
 #include <wx/splitter.h>
+#include "engine/storage/history_manager.hpp"
+
+namespace malama::engine::storage { class HistoryManager; }
 
 namespace malama::ui {
 
@@ -42,6 +46,11 @@ public:
     auto AppendToken(std::string_view token_segment) noexcept -> void;
 
 private:
+    void OnLoadSession(wxCommandEvent& event) noexcept;
+
+    std::unique_ptr<engine::storage::HistoryManager> m_history_manager_ptr;
+    std::string m_current_session_id; // Tracks what chat we are actively in
+
     // Core Layout & Bindings
     void SetupWorkspaceLayout() noexcept;
     void BindActionEvents() noexcept;
@@ -53,6 +62,7 @@ private:
     void OnAboutAction([[maybe_unused]] wxCommandEvent &event) noexcept;
     void OnLicenceAction([[maybe_unused]] wxCommandEvent &event) noexcept;
     void OnUserPromptSubmitted(wxCommandEvent &event) noexcept;
+    void OnNewChatAction([[maybe_unused]] wxCommandEvent &event) noexcept;
 
     // TitleCase for Enums
     enum class MenuId : std::uint16_t {
