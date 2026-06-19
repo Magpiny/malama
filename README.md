@@ -63,7 +63,8 @@ See **malama** v0.2.0 in action:
 
 ```bash
 # Clone the repository
-git clone [https://github.com/Magpiny/malama.git](https://github.com/Magpiny/malama.git)
+# Clone the repository
+git clone https://github.com/Magpiny/malama.git
 cd malama
 
 # Configure and build
