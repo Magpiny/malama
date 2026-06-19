@@ -63,7 +63,7 @@ inline constexpr std::string_view color_code_background = "#1a0105";   //
 inline constexpr int icon_button_margin = 4;
 
 // Asynchronous Network Timeout Thresholds
-inline constexpr int NETWORK_RESOLVE_TIMEOUT_SEC = 10;
+inline constexpr int NETWORK_RESOLVE_TIMEOUT_SEC = 15;
 inline constexpr int NETWORK_CONNECT_TIMEOUT_SEC = 10;
 inline constexpr int NETWORK_WRITE_TIMEOUT_SEC = 30;
 inline constexpr int NETWORK_READ_TIMEOUT_SEC = 60;

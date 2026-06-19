@@ -34,6 +34,7 @@ add_executable(malama
     src/config/config_manager.cpp
     src/engine/markdown/pipeline.cpp
     src/engine/markdown/syntax_registry.cpp
+    src/engine/storage/history_manager.cpp
 )
 
 # -----------------------------------------------------------------------------

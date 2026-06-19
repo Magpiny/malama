@@ -21,6 +21,7 @@
 #include <wx/msgdlg.h>
 
 namespace malama::ui {
+using std::filesystem::path;
 
 wxDEFINE_EVENT(EVT_MALAMA_TOKEN, wxThreadEvent);
 wxDECLARE_EVENT(EVT_USER_PROMPT, wxCommandEvent);
@@ -34,6 +35,16 @@ MainFrame::MainFrame(
     : wxFrame(nullptr, wxID_ANY, title, pos, size), 
       m_on_prompt_submit_callback(std::move(on_prompt_submit)) 
 {
+    // NEW: Bulletproof Native Linux Pathing
+    const char* home_dir = std::getenv("HOME");
+    path app_data_dir =
+        (home_dir != nullptr)
+            ? std::filesystem::path(home_dir) / ".local" / "share" / "malama"
+            : std::filesystem::temp_directory_path() / "malama";
+
+    // Instantiate our zero-copy storage engine
+    m_history_manager_ptr = std::make_unique<engine::storage::HistoryManager>(app_data_dir / "sessions");
+
     SetupMenuBar();
     SetupWorkspaceLayout();
     BindActionEvents();
@@ -84,7 +95,8 @@ void MainFrame::SetupWorkspaceLayout() noexcept {
     if (m_splitter_window_ptr == nullptr) {return;}
 
     // Repeat for panels
-    auto *sidebar = new (std::nothrow) SidebarPanel(m_splitter_window_ptr);
+    // Repeat for panels
+    auto *sidebar = new (std::nothrow) SidebarPanel(m_splitter_window_ptr, m_history_manager_ptr.get());
     m_sidebar_panel_ptr = sidebar;
     if (m_sidebar_panel_ptr == nullptr) { 
         delete m_splitter_window_ptr; 
@@ -111,6 +123,20 @@ void MainFrame::BindActionEvents() noexcept {
     Bind(wxEVT_MENU, &MainFrame::OnAboutAction, this, static_cast<int>(MenuId::AboutId));
     Bind(wxEVT_MENU, &MainFrame::OnLicenceAction, this, static_cast<int>(MenuId::LicenceId));
     Bind(EVT_USER_PROMPT, &MainFrame::OnUserPromptSubmitted, this);
+
+    // Catch the custom event from the Sidebar
+    Bind(EVT_LOAD_SESSION, &MainFrame::OnLoadSession, this);
+}
+
+void MainFrame::OnLoadSession(wxCommandEvent& event) noexcept {
+    m_current_session_id = event.GetString().ToStdString();
+    
+    if (m_history_manager_ptr && (m_chat_panel_ptr != nullptr)) {
+        auto session_opt = m_history_manager_ptr->LoadSession(m_current_session_id);
+        if (session_opt.has_value()) {
+            m_chat_panel_ptr->load_history(session_opt.value());
+        }
+    }
 }
 
 // NEW: Implementation for spawning the Settings Dialog
@@ -144,8 +170,49 @@ void MainFrame::OnLicenceAction([[maybe_unused]] wxCommandEvent &event) noexcept
 }
 
 void MainFrame::OnUserPromptSubmitted(wxCommandEvent &event) noexcept {
+    if (m_history_manager_ptr == nullptr) return;
+
+    std::string prompt_text = event.GetString().ToStdString(wxConvUTF8);
+    if (prompt_text.empty()) return;
+
+    // 1. Is this a brand new conversation?
+    if (m_current_session_id.empty()) {
+        // Generate a dynamic title from the first 25 characters of the prompt
+        std::string default_title = prompt_text.length() > 25 
+                                  ? prompt_text.substr(0, 25) + "..." 
+                                  : prompt_text;
+
+        // Create the session in the storage engine
+        auto new_session = m_history_manager_ptr->CreateSession(default_title);
+        m_current_session_id = new_session.m_session_id;
+
+        // Force the Sidebar to fetch the new index and repaint!
+        if (m_sidebar_panel_ptr != nullptr) {
+            m_sidebar_panel_ptr->PopulateSidebar();
+        }
+    }
+
+    // 2. Append the user message to disk
+    core::Message user_msg;
+    user_msg.m_id = engine::storage::HistoryManager::GenerateUuidString();
+    user_msg.m_role = core::MessageRole::User;
+    user_msg.m_content = prompt_text;
+    user_msg.m_timestamp = engine::storage::HistoryManager::GetCurrentEpoch();
+    user_msg.m_is_starred = false;
+
+    m_history_manager_ptr->AppendMessage(m_current_session_id, user_msg);
+
+    // 3. Pass the prompt to your LLM / Network layer callback
     if (m_on_prompt_submit_callback) {
-        m_on_prompt_submit_callback(event.GetString().ToStdString(wxConvUTF8));
+        m_on_prompt_submit_callback(prompt_text);
+    }
+}
+
+void MainFrame::OnNewChatAction([[maybe_unused]]wxCommandEvent &event) noexcept {
+    m_current_session_id.clear();
+    if (m_chat_panel_ptr != nullptr) {
+        // Clear the HTML window to give them a blank slate
+        m_chat_panel_ptr->load_history(core::ChatSession{}); 
     }
 }
 

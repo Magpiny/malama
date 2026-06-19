@@ -17,6 +17,8 @@
 #include <string_view>
 
 #include "config/config_manager.hpp"
+#include "core/models.hpp"
+
 
 namespace malama::ui {
 
@@ -34,6 +36,7 @@ public:
 
     auto append_token(std::string_view token_segment) noexcept -> void;
     auto append_user_message(std::string_view message) noexcept -> void;
+    auto load_history(const core::ChatSession& session) noexcept -> void;
 
 private:
     auto setup_layout() noexcept -> void;
@@ -44,6 +47,7 @@ private:
     void on_link_clicked(wxHtmlLinkEvent &event) noexcept; // NEW: Intercepts inline copy button
 
     wxHtmlWindow *m_chat_display_ptr{nullptr};
+    wxHtmlWindow *m_html_window_ptr{nullptr};
     wxTextCtrl *m_prompt_input_ptr{nullptr};
     wxButton *m_send_button_ptr{nullptr};
 
