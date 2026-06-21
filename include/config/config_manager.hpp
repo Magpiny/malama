@@ -1,3 +1,13 @@
+// /////////////////////////////////////////////////////////////////////////////
+// Name:        include/config/config_manager.hpp
+// Purpose:     malama app config manager
+// Created:     2026-06-12
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     GPL-3.0-or-later
+// /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0
+
 #pragma once
 
 #include <string>

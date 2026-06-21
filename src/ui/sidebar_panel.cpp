@@ -4,14 +4,14 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ui/sidebar_panel.hpp"
 #include "common/constants.hpp"
-#include "engine/storage/history_manager.hpp" // Required for method access
+#include "engine/storage/history_manager.hpp"
 
 #include <new>
 #include <algorithm>
@@ -24,30 +24,28 @@
 namespace malama::ui {
 
 wxDEFINE_EVENT(EVT_LOAD_SESSION, wxCommandEvent);
+wxDEFINE_EVENT(EVT_NEW_CHAT_REQUESTED, wxCommandEvent);
 
-// Scoped enum for our dynamic context menu
-enum class ContextMenuId : std::uint16_t {
-    TogglePinId = wxID_HIGHEST + 100,
-    RenameId,
-    DeleteId
-};
+// FIXED: Plain signed int constants to avoid type truncation and stock ID macro collisions
+inline constexpr int id_menu_toggle_pin = 11001;
+inline constexpr int id_menu_rename     = 11002;
+inline constexpr int id_menu_delete     = 11003;
+inline constexpr int id_control_new_btn = 11004;
 
 SidebarPanel::SidebarPanel(wxWindow *parent_ptr, engine::storage::HistoryManager *history_manager_ptr)
     : wxPanel(parent_ptr, wxID_ANY), m_history_manager_ptr(history_manager_ptr) {
     
-    // Apply UI Theming
     SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
     
-    SetupLayout();
-    BindEvents();
+    setup_layout();
+    bind_events();
 
-    // Only populate if the manager was successfully injected
     if (m_history_manager_ptr != nullptr) {
-        PopulateSidebar();
+        populate_sidebar();
     }
 }
 
-void SidebarPanel::SetupLayout() noexcept {
+void SidebarPanel::setup_layout() noexcept {
     wxBoxSizer *sizer_ptr = new (std::nothrow) wxBoxSizer(wxVERTICAL); // NOLINT
     if (sizer_ptr == nullptr) {
         return;
@@ -60,36 +58,50 @@ void SidebarPanel::SetupLayout() noexcept {
     }
     header_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
 
-    m_history_list_ptr = new (std::nothrow) wxListBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxBORDER_NONE);
-    if (m_history_list_ptr == nullptr) {
+    m_new_chat_btn_ptr = new (std::nothrow) wxButton(
+        this, id_control_new_btn, "+ New Chat", 
+        wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT
+    );
+    if (m_new_chat_btn_ptr == nullptr) {
         delete header_ptr; // NOLINT
         delete sizer_ptr;  // NOLINT
         return;
     }
+    m_new_chat_btn_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+    m_new_chat_btn_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
+
+    m_history_list_ptr = new (std::nothrow) wxListBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxBORDER_NONE);
+    if (m_history_list_ptr == nullptr) {
+        delete m_new_chat_btn_ptr; // NOLINT
+        delete header_ptr;         // NOLINT
+        delete sizer_ptr;          // NOLINT
+        return;
+    }
     m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
-    m_history_list_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
 
     sizer_ptr->Add(header_ptr, constants::layout_proportion_fixed, wxALL | wxEXPAND, constants::default_margin_padding);
+    sizer_ptr->Add(m_new_chat_btn_ptr, constants::layout_proportion_fixed, wxLEFT | wxRIGHT | wxBOTTOM | wxEXPAND, constants::default_margin_padding);
     sizer_ptr->Add(m_history_list_ptr, constants::layout_proportion_stretch, wxLEFT | wxRIGHT | wxBOTTOM | wxEXPAND, constants::default_margin_padding);
 
     SetSizer(sizer_ptr);
 }
 
-void SidebarPanel::BindEvents() noexcept {
-    if (m_history_list_ptr == nullptr) { return; }
+void SidebarPanel::bind_events() noexcept {
+    if (m_history_list_ptr == nullptr || m_new_chat_btn_ptr == nullptr) { return; }
 
-    // Bind left-click to load the session
-    m_history_list_ptr->Bind(wxEVT_LISTBOX, &SidebarPanel::OnSessionSelected, this);
-    
-    // Bind right-click to spawn the context menu
-    m_history_list_ptr->Bind(wxEVT_CONTEXT_MENU, &SidebarPanel::OnContextMenu, this);
+    m_history_list_ptr->Bind(wxEVT_LISTBOX, &SidebarPanel::on_session_selected, this);
+    m_history_list_ptr->Bind(wxEVT_CONTEXT_MENU, &SidebarPanel::on_context_menu, this);
+    m_new_chat_btn_ptr->Bind(wxEVT_BUTTON, &SidebarPanel::on_new_chat_click, this);
 }
 
-void SidebarPanel::PopulateSidebar() noexcept {
+void SidebarPanel::populate_sidebar() noexcept {
     if (m_history_manager_ptr == nullptr || m_history_list_ptr == nullptr) { return; }
 
     m_history_list_ptr->Clear();
     m_active_metadata.clear();
+
+    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+    m_history_list_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
 
     m_active_metadata = m_history_manager_ptr->LoadAllMetadata();
 
@@ -101,19 +113,32 @@ void SidebarPanel::PopulateSidebar() noexcept {
     });
 
     for (const auto &meta : m_active_metadata) {
-        std::string display_text = (meta.m_is_pinned ? "📌 " : "💬 ") + meta.m_title;
-        m_history_list_ptr->Append(display_text);
+        std::string display_text = (meta.m_is_pinned ? "[P] " : "  ") + meta.m_title;
+        m_history_list_ptr->Append(wxString::FromUTF8(display_text.c_str()));
     }
 
-    // NEW: Force GTK to repaint the listbox immediately
     m_history_list_ptr->Refresh();
     m_history_list_ptr->Update();
     Layout();
 }
 
-void SidebarPanel::OnSessionSelected([[maybe_unused]] wxCommandEvent &event) noexcept {
+void SidebarPanel::on_new_chat_click([[maybe_unused]] wxCommandEvent &event) noexcept {
+    // FIXED: Safely deselects and clears the input focus state to prevent event trapping
+    if (m_history_list_ptr->GetSelection() != wxNOT_FOUND) {
+        m_history_list_ptr->SetSelection(wxNOT_FOUND);
+    }
+    m_new_chat_btn_ptr->SetFocus();
+
+    wxCommandEvent clear_event(EVT_NEW_CHAT_REQUESTED, GetId());
+    clear_event.SetEventObject(this);
+    ProcessWindowEvent(clear_event);
+}
+
+void SidebarPanel::on_session_selected([[maybe_unused]] wxCommandEvent &event) noexcept {
     int selection_index = m_history_list_ptr->GetSelection();
-    if (selection_index == wxNOT_FOUND) { return; }
+    if (selection_index == wxNOT_FOUND || selection_index >= static_cast<int>(m_active_metadata.size())) { 
+        return; 
+    }
 
     wxCommandEvent load_event(EVT_LOAD_SESSION, GetId());
     load_event.SetString(m_active_metadata[selection_index].m_session_id);
@@ -121,7 +146,7 @@ void SidebarPanel::OnSessionSelected([[maybe_unused]] wxCommandEvent &event) noe
     ProcessWindowEvent(load_event);
 }
 
-void SidebarPanel::OnContextMenu([[maybe_unused]] wxContextMenuEvent &event) noexcept {
+void SidebarPanel::on_context_menu([[maybe_unused]] wxContextMenuEvent &event) noexcept {
     if (m_history_manager_ptr == nullptr) { return; }
 
     int selection_index = m_history_list_ptr->GetSelection();
@@ -130,16 +155,15 @@ void SidebarPanel::OnContextMenu([[maybe_unused]] wxContextMenuEvent &event) noe
     wxMenu context_menu;
     bool is_pinned = m_active_metadata[selection_index].m_is_pinned;
     
-    context_menu.Append(static_cast<int>(ContextMenuId::TogglePinId), is_pinned ? "Unpin Session" : "📌 Pin Session");
-    context_menu.Append(static_cast<int>(ContextMenuId::RenameId), "✏️ Rename...");
+    context_menu.Append(id_menu_toggle_pin, is_pinned ? "Unpin Session" : "Pin Session");
+    context_menu.Append(id_menu_rename, "Rename Session...");
     context_menu.AppendSeparator();
-    context_menu.Append(static_cast<int>(ContextMenuId::DeleteId), "🗑️ Delete");
+    context_menu.Append(id_menu_delete, "Delete Session");
 
-    // Capture 'this' and 'selection_index' safely to execute the mutations
     context_menu.Bind(wxEVT_MENU, [this, selection_index](wxCommandEvent&) {
         m_history_manager_ptr->ToggleSessionPin(m_active_metadata[selection_index].m_session_id);
-        PopulateSidebar(); 
-    }, static_cast<int>(ContextMenuId::TogglePinId));
+        populate_sidebar(); 
+    }, id_menu_toggle_pin);
 
     context_menu.Bind(wxEVT_MENU, [this, selection_index](wxCommandEvent&) {
         wxTextEntryDialog dlg(this, "Enter new session title:", "Rename Session", m_active_metadata[selection_index].m_title);
@@ -147,12 +171,22 @@ void SidebarPanel::OnContextMenu([[maybe_unused]] wxContextMenuEvent &event) noe
             std::string new_title = dlg.GetValue().ToStdString();
             if (!new_title.empty()) {
                 m_history_manager_ptr->UpdateSessionTitle(m_active_metadata[selection_index].m_session_id, new_title);
-                PopulateSidebar(); 
+                populate_sidebar(); 
             }
         }
-    }, static_cast<int>(ContextMenuId::RenameId));
+    }, id_menu_rename);
 
-    // Spawn the modal menu at the mouse cursor
+    context_menu.Bind(wxEVT_MENU, [this, selection_index](wxCommandEvent&) {
+        int confirm = wxMessageBox("Are you sure you want to delete this session?", "Confirm Deletion", wxYES_NO | wxICON_WARNING, this);
+        if (confirm == wxYES) {
+            m_history_manager_ptr->DeleteSession(m_active_metadata[selection_index].m_session_id);
+            populate_sidebar();
+            
+            wxCommandEvent reset_event(EVT_NEW_CHAT_REQUESTED, GetId());
+            ProcessWindowEvent(reset_event);
+        }
+    }, id_menu_delete);
+
     PopupMenu(&context_menu);
 }
 
