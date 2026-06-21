@@ -35,7 +35,7 @@ See **malama** v0.2.0 in action:
 [Watch the malama v0.2.0 introduction](./assets/malama_v0.2.0.mp4)
 
 ### The UI
-![Malama v0.2.0 UI]("./assets/malama.png")
+![Malama v0.2.0 UI](./assets/malama.png)
 
 ---
 
