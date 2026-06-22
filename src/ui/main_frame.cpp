@@ -128,7 +128,7 @@ void MainFrame::setup_menu_bar() noexcept {
  * chat panel on the right, configured with default minimum pane size and
  * sash position.
  */
-</function_to_document>
+void MainFrame::setup_workspace_layout() noexcept {
 void MainFrame::setup_workspace_layout() noexcept {
     auto *splitter = new (std::nothrow) wxSplitterWindow(
         this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D
