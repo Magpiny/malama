@@ -32,6 +32,14 @@ inline constexpr int id_menu_rename     = 11002;
 inline constexpr int id_menu_delete     = 11003;
 inline constexpr int id_control_new_btn = 11004;
 
+/**
+ * @brief Initializes a sidebar panel with historical chat sessions.
+ *
+ * Sets up the UI layout and event bindings. If a history manager is provided,
+ * loads and displays previously saved sessions sorted by pin status and recency.
+ *
+ * @param history_manager_ptr Session history manager; if null, sidebar displays empty.
+ */
 SidebarPanel::SidebarPanel(wxWindow *parent_ptr, engine::storage::HistoryManager *history_manager_ptr)
     : wxPanel(parent_ptr, wxID_ANY), m_history_manager_ptr(history_manager_ptr) {
     
@@ -45,6 +53,12 @@ SidebarPanel::SidebarPanel(wxWindow *parent_ptr, engine::storage::HistoryManager
     }
 }
 
+/**
+ * @brief Initializes the sidebar panel's user interface layout.
+ *
+ * Creates and arranges the panel's UI components: a header label, new chat button,
+ * and session list box. Applies appropriate colors and layout proportions to each.
+ */
 void SidebarPanel::setup_layout() noexcept {
     wxBoxSizer *sizer_ptr = new (std::nothrow) wxBoxSizer(wxVERTICAL); // NOLINT
     if (sizer_ptr == nullptr) {
@@ -86,6 +100,9 @@ void SidebarPanel::setup_layout() noexcept {
     SetSizer(sizer_ptr);
 }
 
+/**
+ * @brief Attaches event handlers to the sidebar's list and button controls.
+ */
 void SidebarPanel::bind_events() noexcept {
     if (m_history_list_ptr == nullptr || m_new_chat_btn_ptr == nullptr) { return; }
 
@@ -94,6 +111,13 @@ void SidebarPanel::bind_events() noexcept {
     m_new_chat_btn_ptr->Bind(wxEVT_BUTTON, &SidebarPanel::on_new_chat_click, this);
 }
 
+/**
+ * @brief Populates the sidebar with historical session entries.
+ *
+ * Loads all sessions from the history manager and displays them in the sidebar list.
+ * Sessions are sorted with pinned sessions first, followed by most recently updated.
+ * Pinned sessions are marked with a [P] prefix.
+ */
 void SidebarPanel::populate_sidebar() noexcept {
     if (m_history_manager_ptr == nullptr || m_history_list_ptr == nullptr) { return; }
 
@@ -122,6 +146,12 @@ void SidebarPanel::populate_sidebar() noexcept {
     Layout();
 }
 
+/**
+ * @brief Initiates a new chat session.
+ *
+ * Clears any active list selection to prevent focus issues, sets focus to the new chat button,
+ * and emits `EVT_NEW_CHAT_REQUESTED`.
+ */
 void SidebarPanel::on_new_chat_click([[maybe_unused]] wxCommandEvent &event) noexcept {
     // FIXED: Safely deselects and clears the input focus state to prevent event trapping
     if (m_history_list_ptr->GetSelection() != wxNOT_FOUND) {
@@ -134,6 +164,12 @@ void SidebarPanel::on_new_chat_click([[maybe_unused]] wxCommandEvent &event) noe
     ProcessWindowEvent(clear_event);
 }
 
+/**
+ * @brief Emits a load-session event when a session is selected from the history list.
+ *
+ * If the selection is valid, constructs and dispatches an EVT_LOAD_SESSION event with the
+ * selected session's ID. Invalid selections (no selection or out of bounds) are ignored.
+ */
 void SidebarPanel::on_session_selected([[maybe_unused]] wxCommandEvent &event) noexcept {
     int selection_index = m_history_list_ptr->GetSelection();
     if (selection_index == wxNOT_FOUND || selection_index >= static_cast<int>(m_active_metadata.size())) { 
@@ -146,6 +182,13 @@ void SidebarPanel::on_session_selected([[maybe_unused]] wxCommandEvent &event) n
     ProcessWindowEvent(load_event);
 }
 
+/**
+ * @brief Displays a context menu for managing the selected session.
+ *
+ * Shows options to pin or unpin, rename, and delete the selected session in the list.
+ * When a menu item is selected, the corresponding operation is performed and the sidebar
+ * is refreshed to reflect changes.
+ */
 void SidebarPanel::on_context_menu([[maybe_unused]] wxContextMenuEvent &event) noexcept {
     if (m_history_manager_ptr == nullptr) { return; }
 

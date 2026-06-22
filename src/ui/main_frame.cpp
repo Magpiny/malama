@@ -33,6 +33,16 @@ inline constexpr int id_menu_exit        = 12002;
 inline constexpr int id_menu_about       = 12003;
 inline constexpr int id_menu_licence     = 12004;
 
+/**
+ * @brief Initializes the main application frame with UI setup and session storage.
+ *
+ * Constructs the main window and determines an application data directory
+ * (`$HOME/.local/share/malama` or `/tmp/malama` as fallback). Creates the sessions
+ * subdirectory, instantiates the session history manager, and configures the menu bar,
+ * workspace layout, and event bindings.
+ *
+ * @param on_prompt_submit Callback invoked when the user submits a prompt.
+ */
 MainFrame::MainFrame(
     const wxString &title, 
     const wxPoint &pos, 
@@ -58,18 +68,34 @@ MainFrame::MainFrame(
     bind_action_events();
 }
 
+/**
+ * @brief Appends a user message to the chat panel.
+ *
+ * @param message The user message to append.
+ */
 auto MainFrame::AppendUserMessage(std::string_view message) noexcept -> void {
     if (m_chat_panel_ptr != nullptr) {
         m_chat_panel_ptr->append_user_message(message);
     }
 }
 
+/**
+ * @brief Appends a token segment to the chat display.
+ *
+ * @param token_segment A text segment to append to the active chat.
+ */
 auto MainFrame::AppendToken(std::string_view token_segment) noexcept -> void {
     if (m_chat_panel_ptr != nullptr) {
         m_chat_panel_ptr->append_token(token_segment);
     }
 }
 
+/**
+ * @brief Initializes and installs the application menu bar.
+ *
+ * Creates a menu bar with File menu (Settings, Exit) and Help menu
+ * (Licence, About), then installs it in the main frame.
+ */
 void MainFrame::setup_menu_bar() noexcept {
     wxMenuBar *menu_bar_ptr = new (std::nothrow) wxMenuBar(); // NOLINT
     if (menu_bar_ptr == nullptr) { return; }
@@ -91,6 +117,14 @@ void MainFrame::setup_menu_bar() noexcept {
     SetMenuBar(menu_bar_ptr);
 }
 
+/**
+ * @brief Initializes the main workspace layout.
+ *
+ * Creates a vertical splitter window with a sidebar panel on the left and a
+ * chat panel on the right, configured with default minimum pane size and
+ * sash position.
+ */
+</function_to_document>
 void MainFrame::setup_workspace_layout() noexcept {
     auto *splitter = new (std::nothrow) wxSplitterWindow(
         this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D
@@ -118,6 +152,9 @@ void MainFrame::setup_workspace_layout() noexcept {
     m_splitter_window_ptr->SplitVertically(m_sidebar_panel_ptr, m_chat_panel_ptr, constants::default_sash_position);
 }
 
+/**
+ * @brief Registers event handlers for menu items and custom events.
+ */
 void MainFrame::bind_action_events() noexcept {
     Bind(wxEVT_MENU, &MainFrame::on_preferences_action, this, id_menu_preferences);
     Bind(wxEVT_MENU, &MainFrame::on_exit_action, this, id_menu_exit);
@@ -128,6 +165,11 @@ void MainFrame::bind_action_events() noexcept {
     Bind(EVT_NEW_CHAT_REQUESTED, &MainFrame::on_new_chat_action, this);
 }
 
+/**
+ * @brief Loads a chat session from history and displays it in the chat panel.
+ *
+ * @param event Command event whose string value is the session ID to load.
+ */
 void MainFrame::on_load_session(wxCommandEvent& event) noexcept {
     m_current_session_id = event.GetString().ToStdString();
     
@@ -139,15 +181,24 @@ void MainFrame::on_load_session(wxCommandEvent& event) noexcept {
     }
 }
 
+/**
+ * @brief Displays the application settings dialog.
+ */
 void MainFrame::on_preferences_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     SettingsDialog dialog(this);
     dialog.ShowModal();
 }
 
+/**
+ * @brief Closes the main application window.
+ */
 void MainFrame::on_exit_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     Close(true);
 }
 
+/**
+ * @brief Displays application information and version details.
+ */
 void MainFrame::on_about_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     wxMessageBox(
         "malama Native Local LLM Interface Client\n"
@@ -159,6 +210,11 @@ void MainFrame::on_about_action([[maybe_unused]] wxCommandEvent &event) noexcept
     );
 }
 
+/**
+ * @brief Displays the application's licence information.
+ *
+ * Shows a message box containing the GNU General Public License v3.0 licensing terms.
+ */
 void MainFrame::on_licence_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     wxMessageBox(
         "Distributed under the GNU General Public License v3.0\n",
@@ -168,6 +224,13 @@ void MainFrame::on_licence_action([[maybe_unused]] wxCommandEvent &event) noexce
     );
 }
 
+/**
+ * @brief Processes a user prompt submission and stores it in the current session.
+ *
+ * If no session exists, creates a new one with a title derived from the prompt. Constructs a user message with the submitted prompt and appends it to the session history. Invokes the registered prompt submission callback if set.
+ *
+ * @param event The event containing the submitted prompt text.
+ */
 void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
     if (m_history_manager_ptr == nullptr) return;
 
@@ -206,6 +269,11 @@ void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
     }
 }
 
+/**
+ * @brief Initiates a new chat session.
+ *
+ * Resets the current session and displays an empty chat history.
+ */
 void MainFrame::on_new_chat_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     m_current_session_id.clear();
     if (m_chat_panel_ptr != nullptr) {
