@@ -2,12 +2,15 @@
 
 > Native Linux chat client for local LLMs — no cloud, no browser, no compromise.
 
-[![Licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](#)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](#)
 [![Built with wxWidgets](https://img.shields.io/badge/UI-wxWidgets%203.3-green.svg)](#)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Magpiny/malama?logoColor=maroon)
 
 ---
+
+![Malama](./assets/malama_icon.png)
 
 ## 🚀 Key Features
 
@@ -30,6 +33,10 @@ See **malama** v0.2.0 in action:
 </video>
 
 [Watch the malama v0.2.0 introduction](./assets/malama_v0.2.0.mp4)
+
+### The UI
+![Malama v0.2.0 UI](./assets/malama.png)
+
 ---
 
 ## 🏗 Architecture & Engineering

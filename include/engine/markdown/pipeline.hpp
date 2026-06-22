@@ -1,3 +1,14 @@
+// /////////////////////////////////////////////////////////////////////////////
+// Name:        include/engine/markdown/pipeline.hpp
+// Purpose:     Markdown syntax highlighting pipeline
+// Author:      Wanjare <samuelwanjare@protonmail.com>
+// Created:     2026-06-12
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     GPL-3.0-or-later
+// /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0
+
 #pragma once
 
 #include <cstdint>

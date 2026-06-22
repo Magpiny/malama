@@ -4,7 +4,7 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 // SPDX-License-Identifier: Apache-2.0

@@ -1,7 +1,13 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/engine/markdown/syntax_registry.hpp
-// Purpose:     Pluggable, JSON-ready grammar definitions for Syntax Highlighting
+// Purpose:     Pluggable, JSON-ready grammer definitions for syntax highlighting
+// Author:      Wanjare <wanjare@magpiny.dev>
+// Created:     2026-06-12
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0
 
 #pragma once
 
