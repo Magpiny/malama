@@ -32,6 +32,7 @@ inline constexpr int id_menu_preferences = 12001;
 inline constexpr int id_menu_exit        = 12002;
 inline constexpr int id_menu_about       = 12003;
 inline constexpr int id_menu_licence     = 12004;
+inline constexpr std::size_t MAX_SESSION_TITLE_LENGTH = 25;
 
 /**
  * @brief Initializes the main application frame with UI setup and session storage.
@@ -58,8 +59,11 @@ MainFrame::MainFrame(
             ? std::filesystem::path(home_dir) / ".local" / "share" / "malama"
             : std::filesystem::path("/tmp/malama");
 
-    std::error_code ec;
-    std::filesystem::create_directories(app_data_dir / "sessions", ec);
+    std::error_code session_dir_error;
+    std::filesystem::create_directories(app_data_dir / "sessions", session_dir_error);
+    if (session_dir_error) {
+        wxLogError("Failed to create sessions directory: %s", session_dir_error.message().c_str());
+    }
 
     m_history_manager_ptr = std::make_unique<engine::storage::HistoryManager>(app_data_dir / "sessions");
 
@@ -124,7 +128,7 @@ void MainFrame::setup_menu_bar() noexcept {
  * chat panel on the right, configured with default minimum pane size and
  * sash position.
  */
-</function_to_document>
+void MainFrame::setup_workspace_layout() noexcept {
 void MainFrame::setup_workspace_layout() noexcept {
     auto *splitter = new (std::nothrow) wxSplitterWindow(
         this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D
@@ -232,14 +236,18 @@ void MainFrame::on_licence_action([[maybe_unused]] wxCommandEvent &event) noexce
  * @param event The event containing the submitted prompt text.
  */
 void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
-    if (m_history_manager_ptr == nullptr) return;
+    if (m_history_manager_ptr == nullptr) {
+        return;
+    }
 
     std::string prompt_text = event.GetString().ToStdString(wxConvUTF8);
-    if (prompt_text.empty()) return;
+    if (prompt_text.empty()) {
+        return;
+    }
 
     if (m_current_session_id.empty()) {
-        std::string default_title = prompt_text.length() > 25 
-                                  ? prompt_text.substr(0, 25) + "..." 
+        std::string default_title = prompt_text.length() > MAX_SESSION_TITLE_LENGTH
+                                  ? prompt_text.substr(0, MAX_SESSION_TITLE_LENGTH) + "..."
                                   : prompt_text;
 
         auto new_session = m_history_manager_ptr->CreateSession(default_title);
