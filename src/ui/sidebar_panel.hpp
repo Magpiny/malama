@@ -28,7 +28,10 @@ public:
     SidebarPanel(const SidebarPanel &) = delete;
     SidebarPanel &operator=(const SidebarPanel &) = delete;
     SidebarPanel(SidebarPanel &&) noexcept = delete;
-    SidebarPanel &operator=(SidebarPanel &&) noexcept = delete;
+    /**
+ * @brief SidebarPanel cannot be move-assigned.
+ */
+SidebarPanel &operator=(SidebarPanel &&) noexcept = delete;
 
     void populate_sidebar() noexcept;
 
