@@ -10,8 +10,6 @@
 #include <optional>
 #include <vector>
 #include <string>
-
-#include "core/models.hpp"
 namespace malama::engine::storage {
 
 class HistoryManager {
