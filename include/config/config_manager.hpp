@@ -1,79 +1,94 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/config/config_manager.hpp
-// Purpose:     malama app config manager
+// Purpose:     Thread-safe configuration reflection architecture
+// Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #pragma once
 
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <string>
+#include <string_view>
 #include <vector>
 #include <functional>
 #include <mutex>
 #include <glaze/glaze.hpp>
 
-#include "../src/common/constants.hpp"
+#include "common/constants.hpp"
 
 namespace malama::config {
 
-struct EngineConfig {
+struct EngineConfig final {
     std::string m_host{"127.0.0.1"};
     std::string m_port{"11434"};
-    std::string m_active_model{"qwen2.5-coder:7b"};
+    std::string m_active_model = "ornith:latest";
 };
 
-struct AppearanceConfig {
+struct AppearanceConfig final {
     std::string m_theme_name{"dark_maroon"};
     std::string m_bg_color{"#2d0309"};
     std::string m_surface_color{"#420912"};
     std::string m_text_primary{"#f5f5f7"};
     std::string m_text_accent{"#c4929a"};
     std::string m_code_bg{"#1a0105"};
-    std::string m_code_keyword{"#ff7b72"}; // Pink/Red for keywords
-    std::string m_code_string{"#a5d6ff"};  // Blue for strings
-    std::string m_code_type{"#d2a8ff"};    // Purple for types/classes
-    std::string m_code_comment{"#8b949e"}; // Grey for comments
+    std::string m_code_keyword{"#ff7b72"}; 
+    std::string m_code_string{"#a5d6ff"};  
+    std::string m_code_type{"#d2a8ff"};    
+    std::string m_code_comment{"#8b949e"}; 
     std::string m_code_line_num{"#666666"};
 };
 
-struct InteractionConfig {
-    int m_typewriter_delay_ms{constants::typewriter_delay_timer_ms };
+struct InteractionConfig final {
+    int m_typewriter_delay_ms{constants::typewriter_delay_timer_ms};
 };
 
-struct AppConfig {
+struct AppConfig final {
     EngineConfig m_engine;
     AppearanceConfig m_appearance;
     InteractionConfig m_interaction;
 };
 
-class ConfigManager {
+class ConfigManager final {
 public:
+    // Pure Meyers Singleton Accessor
     static auto get_instance() noexcept -> ConfigManager&;
+
+    ~ConfigManager() = default;
+
+    // FIXED: Explicitly eliminate copy/move mechanics to secure Singleton safety
+    ConfigManager(const ConfigManager&) = delete;
+    ConfigManager& operator=(const ConfigManager&) = delete;
+    ConfigManager(ConfigManager&&) noexcept = delete;
+    ConfigManager& operator=(ConfigManager&&) noexcept = delete;
 
     auto load_config(const std::string& filepath = "malama_config.json") noexcept -> void;
     auto save_config(const std::string& filepath = "malama_config.json") noexcept -> void;
     
-    [[nodiscard]] auto get_config() const noexcept -> const AppConfig&;
+    // FIXED: Returns stack allocation value snapshot to isolate thread operations safely
+    [[nodiscard]] auto get_config() const noexcept -> AppConfig;
     auto update_config(const AppConfig& new_config) noexcept -> void;
 
-    // Observer Pattern: Register callbacks for when config changes
     using observer_callback = std::function<void(const AppConfig&)>;
     auto register_observer(observer_callback callback) noexcept -> void;
 
 private:
     ConfigManager() = default;
+
     AppConfig m_current_config;
     std::vector<observer_callback> m_observers;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex; // FIXED: Marked mutable to allow thread guards in const accessors
 };
 
 } // namespace malama::config
 
-// Glaze Meta mappings for zero-overhead JSON serialization
+// =============================================================================
+// Compile-time Glaze Meta Layout Registries for Zero-Overhead Serialization
+// =============================================================================
+
 template <>
 struct glz::meta<malama::config::EngineConfig> {
     using T = malama::config::EngineConfig;

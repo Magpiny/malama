@@ -7,7 +7,7 @@
 
 namespace malama::core {
 
-enum class MessageRole { System, User, Assistant };
+enum class MessageRole:std::uint8_t { System, User, Assistant };
 
 struct Message {
     std::string m_id;

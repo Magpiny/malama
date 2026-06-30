@@ -24,7 +24,7 @@ inline constexpr std::string_view default_ollama_endpoint = "http://localhost:11
 inline constexpr std::string_view default_ollama_host = "127.0.0.1";
 inline constexpr std::string_view default_ollama_port = "11434";
 inline constexpr std::string_view ollama_generate_path = "/api/generate";
-inline constexpr std::string_view fallback_model_name = "qwen2.5-coder:7b";
+inline constexpr std::string_view fallback_model_name = "ornith:latest";
 
 // Memory & Processing Constraints
 inline constexpr std::size_t absolute_max_buffer_bytes = 8192;

@@ -23,7 +23,8 @@ auto ConfigManager::save_config(const std::string& filepath) noexcept -> void {
     [[maybe_unused]] auto err = glz::write_file_json(m_current_config, filepath, buffer);
 }
 
-auto ConfigManager::get_config() const noexcept -> const AppConfig& {
+auto ConfigManager::get_config() const noexcept -> AppConfig {
+    std::lock_guard<std::mutex> lock(m_mutex);
     return m_current_config;
 }
 

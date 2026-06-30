@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/main.cpp
 // Purpose:     Main application entry point for malama native client
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare <samuelwanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -33,12 +33,12 @@ public:
 
     [[nodiscard]] bool OnInit() override {
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.1.0 MVP Interactivity Engine...\n");
+        spdlog::info("Initializing malama v0.2.1 MVP Interactivity Engine...\n");
 
         Bind(ui::EVT_MALAMA_TOKEN, &MalamaApp::OnTokenReceived, this);
 
         auto *raw_client_ptr = new (std::nothrow) network::OllamaClient(
-            std::string(constants::default_ollama_host), 
+            std::string(constants::default_ollama_host),
             std::string(constants::default_ollama_port)
         );
         if (raw_client_ptr == nullptr) {return false;}
@@ -50,7 +50,7 @@ public:
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(
             "malama Local UI Engine",
-            wxDefaultPosition, 
+            wxDefaultPosition,
             wxSize(constants::default_window_width, constants::default_window_height),
             [this](const std::string& user_prompt) mutable {
 

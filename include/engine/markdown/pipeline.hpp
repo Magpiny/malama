@@ -1,15 +1,15 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/engine/markdown/pipeline.hpp
 // Purpose:     Markdown syntax highlighting pipeline
-// Author:      Wanjare <samuelwanjare@protonmail.com>
+// Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #pragma once
+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <cstdint>
 #include <string>
@@ -20,7 +20,7 @@
 
 namespace malama::engine::markdown {
 
-enum class token_type: std::uint8_t {
+enum class token_type : std::uint8_t {
     paragraph,
     header_1,
     header_2,
@@ -31,28 +31,29 @@ enum class token_type: std::uint8_t {
     divider
 };
 
-struct Token {
+struct Token final {
     token_type m_type;
     std::string m_content;
-    std::string m_language; // Only used for code_block
+    std::string m_language; // Only used for code_block logs
 };
 
-class Pipeline {
+class Pipeline final {
 public:
-    explicit Pipeline(config::AppearanceConfig theme);
+    explicit Pipeline(config::AppearanceConfig theme) noexcept;
+    ~Pipeline() = default;
 
-    // The entry point for the three-stage process
+    Pipeline(const Pipeline&) = delete;
+    Pipeline& operator=(const Pipeline&) = delete;
+    Pipeline(Pipeline&&) noexcept = delete;
+    Pipeline& operator=(Pipeline&&) noexcept = delete;
+
     [[nodiscard]] auto process(std::string_view raw_markdown) const -> std::string;
 
 private:
-    // Stage 1: Scanner
     [[nodiscard]] static auto tokenize(std::string_view text) -> std::vector<Token>;
-    
-    // Stage 2: Styler & Syntax Highlighter
-    [[nodiscard]] auto decorate_code_block(std::string_view code, const std::string& lang) const -> std::string;
+    [[nodiscard]] auto decorate_code_block(std::string_view code,
+                                           const std::string& lang) const -> std::string;
     [[nodiscard]] auto decorate_inline_text(std::string_view text) const -> std::string;
-    
-    // Stage 3: Painter
     [[nodiscard]] auto emit(const std::vector<Token>& tokens) const -> std::string;
 
     config::AppearanceConfig m_theme;

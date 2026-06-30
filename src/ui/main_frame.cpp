@@ -129,7 +129,6 @@ void MainFrame::setup_menu_bar() noexcept {
  * sash position.
  */
 void MainFrame::setup_workspace_layout() noexcept {
-void MainFrame::setup_workspace_layout() noexcept {
     auto *splitter = new (std::nothrow) wxSplitterWindow(
         this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxSP_LIVE_UPDATE | wxSP_3D
     );
@@ -206,7 +205,7 @@ void MainFrame::on_exit_action([[maybe_unused]] wxCommandEvent &event) noexcept 
 void MainFrame::on_about_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     wxMessageBox(
         "malama Native Local LLM Interface Client\n"
-        "Version 0.2.0\n\n"
+        "Version 0.2.1\n\n"
         "Engineered with C++23 & Native wxWidgets for Linux systems.",
         "About malama", 
         wxOK | wxICON_INFORMATION, 

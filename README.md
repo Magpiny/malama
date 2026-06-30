@@ -1,4 +1,4 @@
-# Malama
+# Malama v0.2.2
 
 > Native Linux chat client for local LLMs — no cloud, no browser, no compromise.
 
@@ -10,7 +10,7 @@
 
 ---
 
-![Malama](./assets/malama_icon.png)
+![Malama](./assets/ic_malama.png)
 
 ## 🚀 Key Features
 
@@ -32,10 +32,10 @@ See **malama** v0.2.0 in action:
   Your browser does not support the video tag.
 </video>
 
-[Watch the malama v0.2.0 introduction](./assets/malama_v0.2.0.mp4)
+[Watch the malama v0.2.2 introduction](./assets/malama_v0.2.0.mp4)
 
 ### The UI
-![Malama v0.2.0 UI](./assets/malama.png)
+![Malama v0.2.2 UI](./assets/malama_ui.png)
 
 ---
 
