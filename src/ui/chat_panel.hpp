@@ -9,6 +9,8 @@
 
 #pragma once
 
+// SPDX-License-Identifier: Apache-2.0
+
 #include <wx/panel.h>
 #include <wx/textctrl.h>
 #include <wx/button.h>
@@ -18,7 +20,6 @@
 
 #include "config/config_manager.hpp"
 #include "core/models.hpp"
-
 
 namespace malama::ui {
 
@@ -44,16 +45,18 @@ private:
     auto render_chat_stream() noexcept -> void;
 
     void on_send_action(wxCommandEvent &event) noexcept;
-    void on_link_clicked(wxHtmlLinkEvent &event) noexcept; // NEW: Intercepts inline copy button
+    void on_copy_action(wxCommandEvent &event) noexcept;
+    void on_link_clicked(wxHtmlLinkEvent &event) noexcept; 
 
     wxHtmlWindow *m_chat_display_ptr{nullptr};
     wxHtmlWindow *m_html_window_ptr{nullptr};
     wxTextCtrl *m_prompt_input_ptr{nullptr};
     wxButton *m_send_button_ptr{nullptr};
+    wxButton *m_copy_button_ptr{nullptr};
 
     std::string m_raw_markdown_history;
     std::string m_active_response_stream;
-    std::string m_last_llm_response; // NEW: Stores isolated response for copying
+    std::string m_last_llm_response; 
 };
 
 } // namespace malama::ui
