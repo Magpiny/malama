@@ -1,15 +1,15 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/engine/markdown/syntax_registry.hpp
-// Purpose:     Pluggable, JSON-ready grammer definitions for syntax highlighting
+// Purpose:     Pluggable, JSON-ready grammar definitions for syntax highlighting
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #pragma once
+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <string>
 #include <vector>
@@ -19,26 +19,29 @@
 namespace malama::engine::markdown {
 
 // Maps a regex pattern to an intermediate replacement containing control characters
-struct SyntaxRule {
-    std::regex m_pattern;
-    std::string m_replacement; // e.g., "$1\x07$2\x08"
+struct SyntaxRule final {
+    std::string m_pattern_string;
+    std::regex m_compiled_pattern;
+    std::string m_replacement_format; 
 };
 
 // Represents a complete grammar definition for a language
-struct LanguageSyntax {
+struct LanguageSyntax final {
     std::string m_name;
     std::vector<SyntaxRule> m_rules;
 };
 
 // The centralized grammar manager
-class SyntaxRegistry {
+class SyntaxRegistry final {
 public:
     SyntaxRegistry(); 
+    ~SyntaxRegistry() = default;
     
-    // Future-proofing: Pluggable user grammars
     auto LoadFromJson(const std::string& filepath) -> bool; 
     
-    [[nodiscard]] auto GetSyntaxFor(const std::string& lang_id) const -> const LanguageSyntax*;
+    [[nodiscard]] auto GetSyntaxFor(
+        const std::string& lang_id
+    ) const noexcept -> const LanguageSyntax*;
 
 private:
     void RegisterBuiltinGrammars() noexcept;

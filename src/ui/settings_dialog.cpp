@@ -19,8 +19,8 @@ auto SettingsDialog::setup_layout() noexcept -> void {
     m_notebook_ptr = new (std::nothrow) wxNotebook(this, wxID_ANY);
 
     // --- ENGINE TAB ---
-    malama::owner<wxPanel*> engine_panel = new (std::nothrow) wxPanel(m_notebook_ptr);
-    malama::owner<wxFlexGridSizer*> engine_sizer = new (std::nothrow) wxFlexGridSizer(2, 10, 10);
+    auto *engine_panel = new (std::nothrow) wxPanel(m_notebook_ptr);
+    auto *engine_sizer = new (std::nothrow) wxFlexGridSizer(2, 10, 10);
     engine_sizer->AddGrowableCol(1, 1);
 
     m_host_input_ptr = new (std::nothrow) wxTextCtrl(engine_panel, wxID_ANY);

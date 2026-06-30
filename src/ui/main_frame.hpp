@@ -58,7 +58,7 @@ private:
     void on_preferences_action(wxCommandEvent &event) noexcept;
     void on_exit_action(wxCommandEvent &event) noexcept;
     void on_about_action(wxCommandEvent &event) noexcept;
-    void on_licence_action(wxCommandEvent &event) noexcept;
+    void on_licence_action([[maybe_unused]] wxCommandEvent &event) noexcept;
     void on_user_prompt_submitted(wxCommandEvent &event) noexcept;
     void on_new_chat_action(wxCommandEvent &event) noexcept;
 
