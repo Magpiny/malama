@@ -10,7 +10,7 @@
 
 ---
 
-![Malama](./assets/ic_malama.png)
+![Malama](./assets/ic_malama.jpeg)
 
 ## 🚀 Key Features
 
