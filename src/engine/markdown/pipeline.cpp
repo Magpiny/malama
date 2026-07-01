@@ -221,10 +221,13 @@ auto Pipeline::decorate_code_block(
     // 5. Generate hex carrier payloads for stateless copy & download button events
     std::string hex_str;
     hex_str.reserve(code.size() * 2);
-    static const char digits[] = "0123456789ABCDEF";
-    for (char ch : code) {
-        hex_str.push_back(digits[(ch >> 4) & 0x0F]);
-        hex_str.push_back(digits[ch & 0x0F]);
+    static constexpr std::string_view hex_digits{"0123456789ABCDEF"};
+    static constexpr unsigned int nibble_mask{0x0FU};
+    static constexpr unsigned int bits_per_nibble{4U};
+    for (unsigned char character : code) {
+        const auto byte_value = static_cast<unsigned int>(character);
+        hex_str.push_back(hex_digits.at((byte_value >> bits_per_nibble) & nibble_mask));
+        hex_str.push_back(hex_digits.at(byte_value & nibble_mask));
     }
 
     std::string actions_html = R"(<div align="right">)";
