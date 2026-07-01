@@ -30,6 +30,14 @@ struct TokenizeState {
     std::string m_code_lang;
     bool m_in_code_block{false};
 
+    /**
+     * @brief Emits the buffered token, if any, and clears the buffer state.
+     *
+     * Creates a token from the current buffer content, assigns the given type,
+     * stores the captured language, and appends it to the token list.
+     *
+     * @param type Token type to assign to the buffered content.
+     */
     void push_buffer_as(token_type type) {
         if (!m_current_buffer.empty()) {
             Token tok;
@@ -94,6 +102,15 @@ static auto process_markdown_line(std::string_view line, TokenizeState& state) -
     }
 }
 
+/**
+ * @brief Tokenizes markdown text into a sequence of block tokens.
+ *
+ * Splits the input into lines, applies markdown line classification, and preserves
+ * paragraph and code-block content across line boundaries.
+ *
+ * @param text Markdown source to tokenize.
+ * @return std::vector<Token> The generated token sequence.
+ */
 auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
     TokenizeState state;
     std::string_view remaining = text;
@@ -131,6 +148,13 @@ auto Pipeline::decorate_inline_text(std::string_view text) const -> std::string 
     return processed;
 }
 
+/**
+ * @brief Renders a syntax-highlighted code block as HTML.
+ *
+ * @param code Source code to render.
+ * @param lang Language identifier used to select syntax rules.
+ * @return std::string HTML for the formatted code block, including copy and download actions.
+ */
 auto Pipeline::decorate_code_block(
     std::string_view code, 
     const std::string& lang
@@ -246,6 +270,12 @@ auto Pipeline::decorate_code_block(
     return html;
 }
 
+/**
+ * @brief Renders markdown tokens as HTML.
+ *
+ * @param tokens Token stream produced by the markdown tokenizer.
+ * @return std::string Rendered HTML.
+ */
 auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
     std::string html_output;
     bool in_ul = false;
