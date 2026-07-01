@@ -1,6 +1,6 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/engine/markdown/pipeline.cpp
-// Purpose:     Exception-free data processing logic with isolated control streams
+// Purpose:     Exception-free data processing logic with localized code buttons
 // Author:      Magpiny <magpinyb@proton.me>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
@@ -32,7 +32,10 @@ struct TokenizeState {
 
     void push_buffer_as(token_type type) {
         if (!m_current_buffer.empty()) {
-            Token tok{.m_type = type, .m_content = m_current_buffer, .m_language = m_code_lang};
+            Token tok;
+            tok.m_type = type;
+            tok.m_content = m_current_buffer;
+            tok.m_language = m_code_lang;
             m_tokens.push_back(tok);
             m_current_buffer.clear();
             m_code_lang.clear();
@@ -97,9 +100,8 @@ auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
 
     while (!remaining.empty()) {
         size_t newline_pos = remaining.find('\n');
-        std::string_view raw_line = (newline_pos == std::string_view::npos) 
-                                  ? remaining 
-                                  : remaining.substr(0, newline_pos);
+        bool no_newline = (newline_pos == std::string_view::npos);
+        std::string_view raw_line = no_newline ? remaining : remaining.substr(0, newline_pos);
         
         std::string_view line = raw_line;
         if (!line.empty() && line.back() == '\r') {
@@ -141,14 +143,51 @@ auto Pipeline::decorate_code_block(
     processed = std::regex_replace(processed, std::regex("<"), "&lt;");
     processed = std::regex_replace(processed, std::regex(">"), "&gt;");
 
-    // 2. Map syntax rules cleanly using decoupled temporary references
+    // 2. Map syntax rules using a linear earliest-match pass
     const auto* syntax = m_registry.GetSyntaxFor(lang);
     if (syntax != nullptr) {
-        for (const auto& rule : syntax->m_rules) {
-            const auto& pat = rule.m_compiled_pattern;
-            const auto& fmt = rule.m_replacement_format;
-            processed = std::regex_replace(processed, pat, fmt);
+        std::string result;
+        size_t pos = 0;
+        while (pos < processed.size()) {
+            bool found_any = false;
+            size_t best_start = processed.size();
+            size_t best_end = pos;
+            size_t best_rule_idx = 0;
+            std::smatch best_match;
+
+            for (size_t i = 0; i < syntax->m_rules.size(); ++i) {
+                std::smatch match;
+                auto start_it = processed.cbegin() + pos;
+                auto end_it = processed.cend();
+                const auto& rule = syntax->m_rules[i];
+                if (std::regex_search(start_it, end_it, match, rule.m_compiled_pattern)) {
+                    size_t match_start = pos + match.position();
+                    size_t match_end = match_start + match.length();
+                    if (match_start < best_start) {
+                        best_start = match_start;
+                        best_end = match_end;
+                        best_rule_idx = i;
+                        best_match = match;
+                        found_any = true;
+                    }
+                }
+            }
+
+            if (!found_any) {
+                result += processed.substr(pos);
+                break;
+            }
+
+            result += processed.substr(pos, best_start - pos);
+            const auto& rule = syntax->m_rules[best_rule_idx];
+            result += best_match.format(rule.m_replacement_format);
+            if (best_end == pos) {
+                pos = pos + 1;
+            } else {
+                pos = best_end;
+            }
         }
+        processed = result;
     }
 
     // 3. Format Spacing for wxHtmlWindow (Now isolated from colors completely)
@@ -172,7 +211,6 @@ auto Pipeline::decorate_code_block(
     processed = std::regex_replace(processed, std::regex("\x07"), "<font color=\"#E5C07B\">"); 
     processed = std::regex_replace(processed, std::regex("\x08"), "</font>");
     
-    // Remapped expanded HTML bindings to match non-whitespace indices
     processed = std::regex_replace(processed, std::regex("\x0F"), "<font color=\"#D19A66\">"); 
     processed = std::regex_replace(processed, std::regex("\x10"), "</font>");
     processed = std::regex_replace(processed, std::regex("\x11"), "<font color=\"#98C379\">"); 
@@ -180,12 +218,34 @@ auto Pipeline::decorate_code_block(
     processed = std::regex_replace(processed, std::regex("\x13"), "<font color=\"#43A047\">"); 
     processed = std::regex_replace(processed, std::regex("\x14"), "</font>");
 
+    // 5. Generate hex carrier payloads for stateless copy & download button events
+    std::string hex_str;
+    hex_str.reserve(code.size() * 2);
+    static constexpr std::string_view hex_digits{"0123456789ABCDEF"};
+    static constexpr unsigned int nibble_mask{0x0FU};
+    static constexpr unsigned int bits_per_nibble{4U};
+    for (unsigned char character : code) {
+        const auto byte_value = static_cast<unsigned int>(character);
+        hex_str.push_back(hex_digits.at((byte_value >> bits_per_nibble) & nibble_mask));
+        hex_str.push_back(hex_digits.at(byte_value & nibble_mask));
+    }
+
+    std::string actions_html = R"(<div align="right">)";
+    actions_html += R"(<a href="malama://copy_code:)";
+    actions_html += hex_str;
+    actions_html += R"(" title="Copy"><font size="-1">&#x1F4CB;</font></a>)";
+    actions_html += R"(&nbsp;&nbsp;)";
+    actions_html += R"(<a href="malama://download_code:)";
+    actions_html += hex_str;
+    actions_html += R"(" title="Download"><font size="-1">&#x1F4E5;</font></a>)";
+    actions_html += R"(</div>)";
+
     std::string html = R"(<br><table width="100%" bgcolor=")";
     html += m_theme.m_code_bg;
     html += R"(" cellpadding="10"><tr><td valign="top"><font color=")";
     html += m_theme.m_text_primary;
     html += R"(" face="monospace">)";
-    html += processed + "</font></td></tr></table><br>";
+    html += processed + "</font>" + actions_html + "</td></tr></table><br>";
     return html;
 }
 
@@ -206,7 +266,9 @@ auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
     };
 
     for (const auto& tok : tokens) {
-        if (tok.m_type != token_type::list_unordered && tok.m_type != token_type::list_ordered) {
+        bool is_ul = (tok.m_type == token_type::list_unordered);
+        bool is_ol = (tok.m_type == token_type::list_ordered);
+        if (!is_ul && !is_ol) {
             close_lists();
         }
 
