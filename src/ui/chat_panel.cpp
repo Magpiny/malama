@@ -150,7 +150,9 @@ auto ChatPanel::append_token(std::string_view token_segment) noexcept -> void {
 auto ChatPanel::append_user_message(std::string_view message) noexcept -> void {
     if (!m_active_response_stream.empty()) {
         m_last_llm_response = m_active_response_stream; 
-        m_raw_markdown_history += "\n" + m_active_response_stream + "\n\n---";
+        m_raw_markdown_history.push_back('\n');
+        m_raw_markdown_history += m_active_response_stream;
+        m_raw_markdown_history += "\n\n---";
         m_active_response_stream.clear();
     }
 
