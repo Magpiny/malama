@@ -1,7 +1,7 @@
 # /////////////////////////////////////////////////////////////////////////////
 # Name:        CMakeLists.txt
 # Purpose:     Root modern target-based compilation build for malama
-# Author:      Wanjare <wanjare@magpiny.dev>
+# Author:      Wanjare S. <samuewanjare@protonmail.com>
 # Created:     2026-06-10
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
 # Licence:     Apache-2.0
@@ -38,16 +38,14 @@ add_executable(malama
 )
 
 # -----------------------------------------------------------------------------
-# 3. SET INCLUDE DIRECTORIES
-# This tells the compiler where to look when you say #include "config/..."
+# SET INCLUDE DIRECTORIES
+# Tells the compiler where to search when declaring #include statements
 # -----------------------------------------------------------------------------
 target_include_directories(malama PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 target_compile_features(malama PUBLIC cxx_std_23)
 
-target_include_directories(malama
-    PRIVATE ${CMAKE_SOURCE_DIR}/src
-)
+target_include_directories(malama PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_compile_options(malama PRIVATE
     -Wall -Wextra -Wpedantic -Werror
@@ -62,9 +60,13 @@ find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 
-# Explicitly require the Boost framework to guarantee hermetic environment resolution
-find_package(Boost REQUIRED)
-target_link_libraries(malama PRIVATE Boost::boost)
+# Request Boost system components including compiled binary libraries for regex
+find_package(Boost REQUIRED COMPONENTS regex)
+target_link_libraries(malama PRIVATE Boost::boost Boost::regex)
+
+# Find system SQLite3 layout package engine 
+find_package(SQLite3 REQUIRED)
+target_link_libraries(malama PRIVATE SQLite3::SQLite3)
 
 include(FetchContent)
 
@@ -87,5 +89,5 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glaze)
 
-# Fixed: Explicitly link against the canonical namespaced header interface target
+# Explicitly link against the canonical namespaced header interface target
 target_link_libraries(malama PRIVATE glaze::glaze)
