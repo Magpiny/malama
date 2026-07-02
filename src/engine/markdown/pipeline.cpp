@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/engine/markdown/pipeline.cpp
-// Purpose:     Exception-free data processing logic with localized code buttons
-// Author:      Magpiny <magpinyb@proton.me>
-// Created:     2026-06-12
+// Purpose:     Decoupled zero-allocation markdown pipeline with safe std::array
+// Author:      Wanjare S. <samuewanjare@protonmail.com>
+// Created:     2026-07-01
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -10,11 +10,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "engine/markdown/pipeline.hpp"
+#include <boost/regex.hpp>
+#include <boost/spirit/home/x3.hpp>
 #include <string>
-#include <regex>
+#include <vector>
 #include <utility>
+#include <algorithm>
+#include <array>
 
 namespace malama::engine::markdown {
+
+namespace x3 = boost::spirit::x3;
 
 Pipeline::Pipeline(config::AppearanceConfig theme) noexcept 
     : m_theme(std::move(theme)) {}
@@ -24,110 +30,134 @@ auto Pipeline::process(std::string_view raw_markdown) const -> std::string {
     return emit(tokens);
 }
 
-struct TokenizeState {
+struct TokenizerState {
     std::vector<Token> m_tokens;
-    std::string m_current_buffer;
-    std::string m_code_lang;
-    bool m_in_code_block{false};
+    std::string m_buffer;
+    std::string m_language;
+    bool m_in_block{false};
 
-    void push_buffer_as(token_type type) {
-        if (!m_current_buffer.empty()) {
-            Token tok;
-            tok.m_type = type;
-            tok.m_content = m_current_buffer;
-            tok.m_language = m_code_lang;
-            m_tokens.push_back(tok);
-            m_current_buffer.clear();
-            m_code_lang.clear();
+    void push_buffer(token_type type) {
+        if (!m_buffer.empty()) {
+            Token token;
+            token.m_type = type;
+            token.m_content = m_buffer;
+            token.m_language = m_language;
+            m_tokens.push_back(token);
+            m_buffer.clear();
+            m_language.clear();
         }
     }
 };
 
-static auto process_markdown_line(std::string_view line, TokenizeState& state) -> void {
-    if (line.starts_with("```")) {
-        if (state.m_in_code_block) {
-            state.push_buffer_as(token_type::code_block);
-            state.m_in_code_block = false;
-        } else {
-            state.push_buffer_as(token_type::paragraph);
-            state.m_in_code_block = true;
-            state.m_code_lang = std::string(line.substr(3));
-        }
-        return;
-    } 
-    
-    if (state.m_in_code_block) {
-        state.m_current_buffer += std::string(line) + "\n";
-        return; 
-    } 
-    
-    if (line.starts_with("### ")) {
-        state.push_buffer_as(token_type::paragraph);
-        state.m_current_buffer = line.substr(4);
-        state.push_buffer_as(token_type::header_3);
-    } else if (line.starts_with("## ")) {
-        state.push_buffer_as(token_type::paragraph);
-        state.m_current_buffer = line.substr(3);
-        state.push_buffer_as(token_type::header_2);
-    } else if (line.starts_with("# ")) {
-        state.push_buffer_as(token_type::paragraph);
-        state.m_current_buffer = line.substr(2);
-        state.push_buffer_as(token_type::header_1);
-    } else if (line.starts_with("---")) {
-        state.push_buffer_as(token_type::paragraph);
-        state.push_buffer_as(token_type::divider);
-    } else if (line.starts_with("* ") || line.starts_with("- ")) {
-        state.push_buffer_as(token_type::paragraph); 
-        state.m_current_buffer = line.substr(2);
-        state.push_buffer_as(token_type::list_unordered);
-    } else if (std::regex_search(std::string(line), std::regex(R"(^\d+\.\s)"))) {
-        state.push_buffer_as(token_type::paragraph);
-        size_t dot_pos = line.find('.');
-        state.m_current_buffer = line.substr(dot_pos + 2);
-        state.push_buffer_as(token_type::list_ordered);
+static void parse_markdown_elements(
+    std::string_view line_view,
+    TokenizerState& state
+) {
+    auto head_3_tag = x3::lit("### ");
+    auto head_2_tag = x3::lit("## ");
+    auto head_1_tag = x3::lit("# ");
+    auto divider_tag = x3::lit("---");
+    auto list_un_tag = x3::lit("* ") | x3::lit("- ");
+    auto list_or_tag = x3::lexeme[+x3::digit >> x3::lit(". ")];
+
+    auto line_start = line_view.cbegin();
+    auto line_final = line_view.cend();
+
+    if (x3::parse(line_start, line_final, head_3_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_start, line_final);
+        state.push_buffer(token_type::header_3);
+    } else if (x3::parse(line_start, line_final, head_2_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_start, line_final);
+        state.push_buffer(token_type::header_2);
+    } else if (x3::parse(line_start, line_final, head_1_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_start, line_final);
+        state.push_buffer(token_type::header_1);
+    } else if (x3::parse(line_start, line_final, divider_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.push_buffer(token_type::divider);
+    } else if (x3::parse(line_start, line_final, list_un_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_start, line_final);
+        state.push_buffer(token_type::list_unordered);
+    } else if (x3::parse(line_start, line_final, list_or_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_start, line_final);
+        state.push_buffer(token_type::list_ordered);
     } else {
-        if (line.empty()) {
-            state.m_current_buffer += "<br>";
+        if (line_view.empty()) {
+            state.m_buffer += "<br>";
         } else {
-            state.m_current_buffer += std::string(line) + " ";
+            state.m_buffer += std::string(line_view) + " ";
         }
     }
 }
 
-auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
-    TokenizeState state;
-    std::string_view remaining = text;
+static void evaluate_line_tokens(
+    std::string_view line_view, 
+    TokenizerState& state
+) {
+    auto block_tag = x3::lit("```");
+    auto line_start = line_view.cbegin();
+    auto line_final = line_view.cend();
 
-    while (!remaining.empty()) {
-        size_t newline_pos = remaining.find('\n');
-        bool no_newline = (newline_pos == std::string_view::npos);
-        std::string_view raw_line = no_newline ? remaining : remaining.substr(0, newline_pos);
-        
-        std::string_view line = raw_line;
-        if (!line.empty() && line.back() == '\r') {
-            line.remove_suffix(1);
-        }
-
-        if (newline_pos == std::string_view::npos) {
-            remaining = "";
+    if (x3::parse(line_start, line_final, block_tag)) {
+        if (state.m_in_block) {
+            state.push_buffer(token_type::code_block);
+            state.m_in_block = false;
         } else {
-            remaining.remove_prefix(newline_pos + 1);
+            state.push_buffer(token_type::paragraph);
+            state.m_in_block = true;
+            state.m_language = std::string(line_start, line_final);
+        }
+        return;
+    }
+
+    if (state.m_in_block) {
+        state.m_buffer += std::string(line_view) + "\n";
+        return;
+    }
+
+    parse_markdown_elements(line_view, state);
+}
+
+auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
+    TokenizerState state;
+    auto start_iter = text.cbegin();
+    auto final_iter = text.cend();
+
+    while (start_iter != final_iter) {
+        auto end_line_iter = std::find(start_iter, final_iter, '\n');
+        std::string_view line_view(&*start_iter, std::distance(start_iter, end_line_iter));
+        
+        if (!line_view.empty() && line_view.back() == '\r') {
+            line_view.remove_suffix(1);
         }
 
-        process_markdown_line(line, state);
+        evaluate_line_tokens(line_view, state);
+
+        if (end_line_iter == final_iter) {
+            break;
+        }
+        start_iter = end_line_iter + 1;
     }
-    
-    state.push_buffer_as(token_type::paragraph);
+
+    state.push_buffer(token_type::paragraph);
     return state.m_tokens;
 }
 
 auto Pipeline::decorate_inline_text(std::string_view text) const -> std::string {
+    static const boost::regex bold_pattern(R"(\*\*(.*?)\*\*)");
+    static const boost::regex code_pattern(R"(`(.*?)`)");
+
     std::string processed{text};
-    processed = std::regex_replace(processed, std::regex(R"(\*\*(.*?)\*\*)"), "<b>$1</b>");
+    processed = boost::regex_replace(processed, bold_pattern, "<b>$1</b>");
     
     std::string inline_code_tag = "<font color=\"" + m_theme.m_code_string + 
                                   R"(" face="monospace">$1</font>)";
-    processed = std::regex_replace(processed, std::regex(R"(`(.*?)`)"), inline_code_tag);
+    processed = boost::regex_replace(processed, code_pattern, inline_code_tag);
     return processed;
 }
 
@@ -135,186 +165,199 @@ auto Pipeline::decorate_code_block(
     std::string_view code, 
     const std::string& lang
 ) const -> std::string {
+    static const boost::regex entity_amp("&");
+    static const boost::regex entity_lt("<");
+    static const boost::regex entity_gt(">");
+    static const boost::regex format_nl("\n");
+    static const boost::regex format_tab("\t");
+    static const boost::regex format_sp("  ");
+    static const boost::regex marker_01("\x01");
+    static const boost::regex marker_02("\x02");
+    static const boost::regex marker_03("\x03");
+    static const boost::regex marker_04("\x04");
+    static const boost::regex marker_05("\x05");
+    static const boost::regex marker_06("\x06");
+    static const boost::regex marker_07("\x07");
+    static const boost::regex marker_08("\x08");
+    static const boost::regex marker_0F("\x0F");
+    static const boost::regex marker_10("\x10");
+    static const boost::regex marker_11("\x11");
+    static const boost::regex marker_12("\x12");
+    static const boost::regex marker_13("\x13");
+    static const boost::regex marker_14("\x14");
+
     std::string processed{code};
     std::erase(processed, '\r');
 
-    // 1. Encode HTML entities FIRST
-    processed = std::regex_replace(processed, std::regex("&"), "&amp;");
-    processed = std::regex_replace(processed, std::regex("<"), "&lt;");
-    processed = std::regex_replace(processed, std::regex(">"), "&gt;");
+    processed = boost::regex_replace(processed, entity_amp, "&amp;");
+    processed = boost::regex_replace(processed, entity_lt, "&lt;");
+    processed = boost::regex_replace(processed, entity_gt, "&gt;");
 
-    // 2. Map syntax rules using a linear earliest-match pass
     const auto* syntax = m_registry.GetSyntaxFor(lang);
     if (syntax != nullptr) {
-        std::string result;
-        size_t pos = 0;
-        while (pos < processed.size()) {
+        std::string result_string;
+        size_t current_pos = 0;
+        while (current_pos < processed.size()) {
             bool found_any = false;
             size_t best_start = processed.size();
-            size_t best_end = pos;
+            size_t best_final = current_pos;
             size_t best_rule_idx = 0;
-            std::smatch best_match;
+            boost::smatch best_match;
 
-            for (size_t i = 0; i < syntax->m_rules.size(); ++i) {
-                std::smatch match;
-                auto start_it = processed.cbegin() + pos;
-                auto end_it = processed.cend();
-                const auto& rule = syntax->m_rules[i];
-                if (std::regex_search(start_it, end_it, match, rule.m_compiled_pattern)) {
-                    size_t match_start = pos + match.position();
-                    size_t match_end = match_start + match.length();
+            for (size_t rule_idx = 0; rule_idx < syntax->m_rules.size(); ++rule_idx) {
+                boost::smatch match_results;
+                auto start_iter = processed.cbegin() + current_pos;
+                auto final_iter = processed.cend();
+                const auto& rule_ref = syntax->m_rules[rule_idx];
+                if (boost::regex_search(start_iter, final_iter, match_results, 
+                    rule_ref.m_compiled_pattern)) {
+                    size_t match_start = current_pos + match_results.position();
+                    size_t match_final = match_start + match_results.length();
                     if (match_start < best_start) {
                         best_start = match_start;
-                        best_end = match_end;
-                        best_rule_idx = i;
-                        best_match = match;
+                        best_final = match_final;
+                        best_rule_idx = rule_idx;
+                        best_match = match_results;
                         found_any = true;
                     }
                 }
             }
 
             if (!found_any) {
-                result += processed.substr(pos);
+                result_string += processed.substr(current_pos);
                 break;
             }
 
-            result += processed.substr(pos, best_start - pos);
-            const auto& rule = syntax->m_rules[best_rule_idx];
-            result += best_match.format(rule.m_replacement_format);
-            if (best_end == pos) {
-                pos = pos + 1;
-            } else {
-                pos = best_end;
-            }
+            result_string += processed.substr(current_pos, best_start - current_pos);
+            const auto& rule_ref = syntax->m_rules[best_rule_idx];
+            result_string += best_match.format(rule_ref.m_replacement_format);
+            current_pos = (best_final == current_pos) ? current_pos + 1 : best_final;
         }
-        processed = result;
+        processed = result_string;
     }
 
-    // 3. Format Spacing for wxHtmlWindow (Now isolated from colors completely)
-    processed = std::regex_replace(processed, std::regex("\n"), "<br>");
-    processed = std::regex_replace(processed, std::regex("\t"), "&nbsp;&nbsp;&nbsp;&nbsp;");
-    processed = std::regex_replace(processed, std::regex("  "), "&nbsp;&nbsp;");
+    processed = boost::regex_replace(processed, format_nl, "<br>");
+    processed = boost::regex_replace(processed, format_tab, "&nbsp;&nbsp;&nbsp;&nbsp;");
+    processed = boost::regex_replace(processed, format_sp, "&nbsp;&nbsp;");
 
-    // 4. Expand Control Markers to Colors safely
-    std::string t_str = "<font color=\"" + m_theme.m_code_string + "\">";
-    processed = std::regex_replace(processed, std::regex("\x01"), t_str);
-    processed = std::regex_replace(processed, std::regex("\x02"), "</font>");
+    std::string text_color_tag = "<font color=\"" + m_theme.m_code_string + "\">";
+    processed = boost::regex_replace(processed, marker_01, text_color_tag);
+    processed = boost::regex_replace(processed, marker_02, "</font>");
 
-    std::string t_com = "<font color=\"" + m_theme.m_code_comment + "\">";
-    processed = std::regex_replace(processed, std::regex("\x03"), t_com);
-    processed = std::regex_replace(processed, std::regex("\x04"), "</font>");
+    std::string comment_color_tag = "<font color=\"" + m_theme.m_code_comment + "\">";
+    processed = boost::regex_replace(processed, marker_03, comment_color_tag);
+    processed = boost::regex_replace(processed, marker_04, "</font>");
 
-    std::string t_key = "<font color=\"" + m_theme.m_code_keyword + "\">";
-    processed = std::regex_replace(processed, std::regex("\x05"), t_key);
-    processed = std::regex_replace(processed, std::regex("\x06"), "</font>");
+    std::string keyword_color_tag = "<font color=\"" + m_theme.m_code_keyword + "\">";
+    processed = boost::regex_replace(processed, marker_05, keyword_color_tag);
+    processed = boost::regex_replace(processed, marker_06, "</font>");
 
-    processed = std::regex_replace(processed, std::regex("\x07"), "<font color=\"#E5C07B\">"); 
-    processed = std::regex_replace(processed, std::regex("\x08"), "</font>");
-    
-    processed = std::regex_replace(processed, std::regex("\x0F"), "<font color=\"#D19A66\">"); 
-    processed = std::regex_replace(processed, std::regex("\x10"), "</font>");
-    processed = std::regex_replace(processed, std::regex("\x11"), "<font color=\"#98C379\">"); 
-    processed = std::regex_replace(processed, std::regex("\x12"), "</font>");
-    processed = std::regex_replace(processed, std::regex("\x13"), "<font color=\"#43A047\">"); 
-    processed = std::regex_replace(processed, std::regex("\x14"), "</font>");
+    processed = boost::regex_replace(processed, marker_07, "<font color=\"#E5C07B\">"); 
+    processed = boost::regex_replace(processed, marker_08, "</font>");
+    processed = boost::regex_replace(processed, marker_0F, "<font color=\"#D19A66\">"); 
+    processed = boost::regex_replace(processed, marker_10, "</font>");
+    processed = boost::regex_replace(processed, marker_11, "<font color=\"#98C379\">"); 
+    processed = boost::regex_replace(processed, marker_12, "</font>");
+    processed = boost::regex_replace(processed, marker_13, "<font color=\"#43A047\">"); 
+    processed = boost::regex_replace(processed, marker_14, "</font>");
 
-    // 5. Generate hex carrier payloads for stateless copy & download button events
-    std::string hex_str;
-    hex_str.reserve(code.size() * 2);
-    static constexpr std::string_view hex_digits{"0123456789ABCDEF"};
-    static constexpr unsigned int nibble_mask{0x0FU};
-    static constexpr unsigned int bits_per_nibble{4U};
-    for (unsigned char character : code) {
-        const auto byte_value = static_cast<unsigned int>(character);
-        hex_str.push_back(hex_digits.at((byte_value >> bits_per_nibble) & nibble_mask));
-        hex_str.push_back(hex_digits.at(byte_value & nibble_mask));
+    std::string hex_encoded_string;
+    hex_encoded_string.reserve(code.size() * 2);
+
+    // Replaced standard C-style array format with standard type-safe std::array layout
+    static const std::array<char, 16> hex_digits{
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
+    };
+    for (char character_value : code) {
+        hex_encoded_string.push_back(hex_digits[(character_value >> 4) & 0x0F]);
+        hex_encoded_string.push_back(hex_digits[character_value & 0x0F]);
     }
 
     std::string actions_html = R"(<div align="right">)";
     actions_html += R"(<a href="malama://copy_code:)";
-    actions_html += hex_str;
+    actions_html += hex_encoded_string;
     actions_html += R"(" title="Copy"><font size="-1">&#x1F4CB;</font></a>)";
     actions_html += R"(&nbsp;&nbsp;)";
     actions_html += R"(<a href="malama://download_code:)";
-    actions_html += hex_str;
+    actions_html += hex_encoded_string;
     actions_html += R"(" title="Download"><font size="-1">&#x1F4E5;</font></a>)";
     actions_html += R"(</div>)";
 
-    std::string html = R"(<br><table width="100%" bgcolor=")";
-    html += m_theme.m_code_bg;
-    html += R"(" cellpadding="10"><tr><td valign="top"><font color=")";
-    html += m_theme.m_text_primary;
-    html += R"(" face="monospace">)";
-    html += processed + "</font>" + actions_html + "</td></tr></table><br>";
-    return html;
+    std::string html_output = R"(<br><table width="100%" bgcolor=")";
+    html_output += m_theme.m_code_bg;
+    html_output += R"(" cellpadding="10"><tr><td valign="top"><font color=")";
+    html_output += m_theme.m_text_primary;
+    html_output += R"(" face="monospace">)";
+    html_output += processed + "</font>" + actions_html + "</td></tr></table><br>";
+    return html_output;
 }
 
 auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
     std::string html_output;
-    bool in_ul = false;
-    bool in_ol = false;
+    bool in_unordered_list = false;
+    bool in_ordered_list = false;
 
     auto close_lists = [&]() {
-        if (in_ul) {
+        if (in_unordered_list) {
             html_output += "</ul>";
-            in_ul = false;
+            in_unordered_list = false;
         }
-        if (in_ol) {
+        if (in_ordered_list) {
             html_output += "</ol><br>";
-            in_ol = false;
+            in_ordered_list = false;
         }
     };
 
-    for (const auto& tok : tokens) {
-        bool is_ul = (tok.m_type == token_type::list_unordered);
-        bool is_ol = (tok.m_type == token_type::list_ordered);
+    for (const auto& token_ref : tokens) {
+        bool is_ul = (token_ref.m_type == token_type::list_unordered);
+        bool is_ol = (token_ref.m_type == token_type::list_ordered);
         if (!is_ul && !is_ol) {
             close_lists();
         }
 
-        switch (tok.m_type) {
+        switch (token_ref.m_type) {
             case token_type::header_1:
                 html_output += R"(<br><b><font size="+2" color=")";
                 html_output += m_theme.m_text_accent;
-                html_output += "\">" + decorate_inline_text(tok.m_content);
+                html_output += "\">" + decorate_inline_text(token_ref.m_content);
                 html_output += "</font></b><br><br>";
                 break;
             case token_type::header_2:
                 html_output += R"(<br><b><font size="+1" color=")";
                 html_output += m_theme.m_text_accent;
-                html_output += "\">" + decorate_inline_text(tok.m_content);
+                html_output += "\">" + decorate_inline_text(token_ref.m_content);
                 html_output += "</font></b><br><br>";
                 break;
             case token_type::header_3:
                 html_output += "<br><b><font color=\"";
                 html_output += m_theme.m_text_accent;
-                html_output += "\">" + decorate_inline_text(tok.m_content);
+                html_output += "\">" + decorate_inline_text(token_ref.m_content);
                 html_output += "</font></b><br><br>";
                 break;
             case token_type::divider:
                 html_output += "<hr>";
                 break;
             case token_type::list_unordered:
-                if (!in_ul) {
+                if (!in_unordered_list) {
                     html_output += "<ul>";
-                    in_ul = true;
+                    in_unordered_list = true;
                 }
-                html_output += "<li>" + decorate_inline_text(tok.m_content) + "</li>";
+                html_output += "<li>" + decorate_inline_text(token_ref.m_content) + "</li>";
                 break;
             case token_type::list_ordered:
-                if (!in_ol) {
+                if (!in_ordered_list) {
                     html_output += "<ol>";
-                    in_ol = true;
+                    in_ordered_list = true;
                 }
-                html_output += "<li>" + decorate_inline_text(tok.m_content) + "</li>";
+                html_output += "<li>" + decorate_inline_text(token_ref.m_content) + "</li>";
                 break;
             case token_type::code_block:
-                html_output += decorate_code_block(tok.m_content, tok.m_language);
+                html_output += decorate_code_block(token_ref.m_content, token_ref.m_language);
                 break;
             case token_type::paragraph:
             default:
-                if (!tok.m_content.empty()) {
-                    html_output += "<p>" + decorate_inline_text(tok.m_content) + "</p>";
+                if (!token_ref.m_content.empty()) {
+                    html_output += "<p>" + decorate_inline_text(token_ref.m_content) + "</p>";
                 }
                 break;
         }

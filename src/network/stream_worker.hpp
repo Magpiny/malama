@@ -12,7 +12,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "network/ollama_client.hpp"
-#include "common/types.hpp"
+#include "core/models.hpp"
 
 #include <memory>
 #include <string>
@@ -28,22 +28,22 @@ public:
     ~StreamWorker() = default;
 
     StreamWorker(const StreamWorker &) = delete;
-    StreamWorker &operator=(const StreamWorker &) = delete;
+    auto operator=(const StreamWorker &) -> StreamWorker & = delete;
     StreamWorker(StreamWorker &&) noexcept = default;
-    StreamWorker &operator=(StreamWorker &&) noexcept = default;
+    auto operator=(StreamWorker &&) noexcept -> StreamWorker & = default;
 
     auto InitializeGeneration(
         std::string_view model_name,
         std::string_view prompt_text,
-        const std::vector<common::Message> &history_context,
-        std::function<void(std::string_view)> token_callback
+        const std::vector<core::Message> &history_context,
+        std::function<void(std::string_view, bool)> token_callback
     ) noexcept -> void;
 
     auto IngestRawNetworkBytes(std::string_view incoming_bytes) noexcept -> void;
 
 private:
     std::unique_ptr<OllamaClient> m_client_ptr;
-    std::function<void(std::string_view)> m_token_callback;
+    std::function<void(std::string_view, bool)> m_token_callback;
     std::string m_residual_buffer{};
 };
 

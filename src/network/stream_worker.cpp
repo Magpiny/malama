@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/stream_worker.cpp
 // Purpose:     Implements line-splitting algorithms and non-throwing JSON decoding
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S.<samuelwanjare@protonmail.com>
 // Created:     2026-06-11
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
@@ -22,8 +22,8 @@ StreamWorker::StreamWorker(std::unique_ptr<OllamaClient> client_ptr) noexcept
 auto StreamWorker::InitializeGeneration(
     std::string_view model_name,
     std::string_view prompt_text,
-    [[maybe_unused]] const std::vector<common::Message> &history_context,
-    std::function<void(std::string_view)> token_callback
+    [[maybe_unused]] const std::vector<core::Message> &history_context,
+    std::function<void(std::string_view, bool)> token_callback
 ) noexcept -> void {
     m_token_callback = std::move(token_callback);
     m_residual_buffer.clear();
@@ -43,7 +43,7 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
     try {
         const std::size_t allowed = constants::absolute_max_buffer_bytes - m_residual_buffer.size();
         if (allowed == 0) {
-            spdlog::warn("Residual buffer reached maximum size; clearing buffer to prevent unbounded growth");
+            spdlog::warn("Residual buffer limit reached; flushing allocation frame context.");
             m_residual_buffer.clear();
             return;
         }
@@ -63,27 +63,32 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
         std::string_view current_line = processing_view.substr(0, newline_position);
         processing_view.remove_prefix(newline_position + 1);
         
-        // Fixed: Strip trailing carriage returns (\r) left over from HTTP/TCP framing
         if (!current_line.empty() && current_line.back() == '\r') {
             current_line.remove_suffix(1);
         }
 
-        // Fixed: Skip HTTP headers entirely; only parse lines starting with a JSON object brace
         if (!current_line.empty() && current_line.front() == '{') {
             OllamaGenerateChunk parsed_chunk{};
             
-            // Fixed: Pass glz::opts to explicitly disable unknown key enforcement (Error 37)
-            const auto execution_error = glz::read<glz::opts{.error_on_unknown_keys = false}>(parsed_chunk, current_line);
+            const auto execution_error = glz::read<glz::opts{.error_on_unknown_keys = false}>(
+                parsed_chunk, current_line
+            );
             
             if (!execution_error) [[likely]] {
                 if (!parsed_chunk.response.empty()) {
-                    m_token_callback(parsed_chunk.response);
+                    // Send parsed text token segment down the async bridge pipeline
+                    m_token_callback(parsed_chunk.response, false);
                 }
                 if (parsed_chunk.done) {
                     spdlog::info("Ollama discrete token generation stream marked finalized.");
+                    // Fire termination marker pass containing validation flag state
+                    m_token_callback("", true);
                 }
             } else {
-                spdlog::warn("Glaze parser discarded corrupted frame segment. Details: {}", static_cast<int>(execution_error.ec));
+                spdlog::warn(
+                    "Glaze parser discarded corrupted frame segment. Error code: {}", 
+                    static_cast<int>(execution_error.ec)
+                );
             }
         }
     }

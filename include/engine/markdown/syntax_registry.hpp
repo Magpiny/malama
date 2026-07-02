@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/engine/markdown/syntax_registry.hpp
 // Purpose:     Pluggable, JSON-ready grammar definitions for syntax highlighting
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S. <samuewanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -14,14 +14,14 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include <regex>
+#include <boost/regex.hpp>
 
 namespace malama::engine::markdown {
 
 // Maps a regex pattern to an intermediate replacement containing control characters
 struct SyntaxRule final {
     std::string m_pattern_string;
-    std::regex m_compiled_pattern;
+    boost::regex m_compiled_pattern;
     std::string m_replacement_format; 
 };
 
