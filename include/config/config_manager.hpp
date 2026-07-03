@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/config/config_manager.hpp
 // Purpose:     Thread-safe configuration reflection architecture
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -26,6 +26,7 @@ struct EngineConfig final {
     std::string m_host{"127.0.0.1"};
     std::string m_port{"11434"};
     std::string m_active_model = "ornith:latest";
+    bool m_thinking_enabled{false}; // Dynamic toggle flag parameter
 };
 
 struct AppearanceConfig final {
@@ -54,21 +55,18 @@ struct AppConfig final {
 
 class ConfigManager final {
 public:
-    // Pure Meyers Singleton Accessor
     static auto get_instance() noexcept -> ConfigManager&;
 
     ~ConfigManager() = default;
 
-    // FIXED: Explicitly eliminate copy/move mechanics to secure Singleton safety
     ConfigManager(const ConfigManager&) = delete;
-    ConfigManager& operator=(const ConfigManager&) = delete;
+    auto operator=(const ConfigManager&) -> ConfigManager& = delete;
     ConfigManager(ConfigManager&&) noexcept = delete;
-    ConfigManager& operator=(ConfigManager&&) noexcept = delete;
+    auto operator=(ConfigManager&&) noexcept -> ConfigManager& = delete;
 
     auto load_config(const std::string& filepath = "malama_config.json") noexcept -> void;
     auto save_config(const std::string& filepath = "malama_config.json") noexcept -> void;
     
-    // FIXED: Returns stack allocation value snapshot to isolate thread operations safely
     [[nodiscard]] auto get_config() const noexcept -> AppConfig;
     auto update_config(const AppConfig& new_config) noexcept -> void;
 
@@ -80,14 +78,10 @@ private:
 
     AppConfig m_current_config;
     std::vector<observer_callback> m_observers;
-    mutable std::mutex m_mutex; // FIXED: Marked mutable to allow thread guards in const accessors
+    mutable std::mutex m_mutex; 
 };
 
 } // namespace malama::config
-
-// =============================================================================
-// Compile-time Glaze Meta Layout Registries for Zero-Overhead Serialization
-// =============================================================================
 
 template <>
 struct glz::meta<malama::config::EngineConfig> {
@@ -95,7 +89,8 @@ struct glz::meta<malama::config::EngineConfig> {
     static constexpr auto value = object(
         "host", &T::m_host,
         "port", &T::m_port,
-        "active_model", &T::m_active_model
+        "active_model", &T::m_active_model,
+        "thinking_enabled", &T::m_thinking_enabled
     );
 };
 

@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/stream_worker.cpp
 // Purpose:     Implements line-splitting algorithms and non-throwing JSON decoding
-// Author:      Wanjare S.<samuelwanjare@protonmail.com>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-11
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
@@ -11,8 +11,15 @@
 
 #include "network/stream_worker.hpp"
 #include "network/ollama_chunks.hpp"
+#include "config/config_manager.hpp"
 
 #include <spdlog/spdlog.h>
+#include <algorithm>
+
+namespace {
+// Thread-safe state tracking vector isolating reasoning streams per background worker
+thread_local bool g_in_thinking_block = false;
+}
 
 namespace malama::network {
 
@@ -27,6 +34,7 @@ auto StreamWorker::InitializeGeneration(
 ) noexcept -> void {
     m_token_callback = std::move(token_callback);
     m_residual_buffer.clear();
+    g_in_thinking_block = false;
 
     spdlog::debug("Stream worker target initialized for active model: {}", model_name);
 
@@ -41,7 +49,8 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
     }
 
     try {
-        const std::size_t allowed = constants::absolute_max_buffer_bytes - m_residual_buffer.size();
+        const std::size_t allowed = 
+            constants::absolute_max_buffer_bytes - m_residual_buffer.size();
         if (allowed == 0) {
             spdlog::warn("Residual buffer limit reached; flushing allocation frame context.");
             m_residual_buffer.clear();
@@ -76,12 +85,42 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
             
             if (!execution_error) [[likely]] {
                 if (!parsed_chunk.response.empty()) {
-                    // Send parsed text token segment down the async bridge pipeline
-                    m_token_callback(parsed_chunk.response, false);
+                    const auto runtime_config = 
+                        config::ConfigManager::get_instance().get_config();
+
+                    if (!runtime_config.m_engine.m_thinking_enabled) {
+                        std::string token_str = parsed_chunk.response;
+
+                        if (token_str.find("<think>") != std::string::npos) {
+                            g_in_thinking_block = true;
+                            auto position = token_str.find("<think>");
+                            std::string before = token_str.substr(0, position);
+                            if (!before.empty()) {
+                                m_token_callback(before, false);
+                            }
+                            token_str = token_str.substr(position + 7);
+                        }
+                        
+                        if (g_in_thinking_block) {
+                            if (token_str.find("</think>") != std::string::npos) {
+                                g_in_thinking_block = false;
+                                auto position = token_str.find("</think>");
+                                std::string after = token_str.substr(position + 8);
+                                if (!after.empty()) {
+                                    m_token_callback(after, false);
+                                }
+                            }
+                        } else {
+                            if (!token_str.empty()) {
+                                m_token_callback(token_str, false);
+                            }
+                        }
+                    } else {
+                        m_token_callback(parsed_chunk.response, false);
+                    }
                 }
                 if (parsed_chunk.done) {
                     spdlog::info("Ollama discrete token generation stream marked finalized.");
-                    // Fire termination marker pass containing validation flag state
                     m_token_callback("", true);
                 }
             } else {

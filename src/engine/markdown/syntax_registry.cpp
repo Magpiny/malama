@@ -85,9 +85,10 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
             pat_cpp_preproc, boost::regex(pat_cpp_preproc), "\x05$1\x06"
         });
 
-        std::string pat_cpp_keyword = R"(\b(auto|const|int|void|std|return|public|private|)";
-        pat_cpp_keyword += R"(protected|namespace|using|template|typename|new|delete|if|)";
-        pat_cpp_keyword += R"(else|while|for)\b)";
+        std::string pat_cpp_keyword = R"(\b(auto|const|constexpr|std|int|void|std|return|public|private|string|catch|decltype|)";
+        pat_cpp_keyword += R"(protected|namespace|using|template|typename|new|delete|if|&&|&=|!|!=|&|asm|typeid|throw|try|function|)";
+        pat_cpp_keyword += R"(goto|do|explicit|export|import|noexcept|co_await|co_yield|co_return|inline|operator|sizeof|static|)";
+        pat_cpp_keyword += R"(else|while|for|virtual|enum|char|bool|switch|this|final|override|long|short|thread|jthread|break|)\b)";
         lang_cpp.m_rules.push_back({
             pat_cpp_keyword, boost::regex(pat_cpp_keyword), "\x05$1\x06"
         });
@@ -137,8 +138,8 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
             pat_py_func, boost::regex(pat_py_func), "\x13$1\x14"
         });
 
-        std::string pat_py_keyword = R"(\b(return|if|else|elif|for|while|import|from|in|is|)";
-        pat_py_keyword += R"(and|or|not|True|False|None|self|pass|break|continue)\b)";
+        std::string pat_py_keyword = R"(\b(return|if|else|elif|for|while|import|yield|from|in|is|kwargs|args|def|not|class|)";
+        pat_py_keyword += R"(and|or|list|dict|tuple|set|str|int|float|bool|not|True|False|None|self|pass|break|continue)\b)";
         lang_python.m_rules.push_back({
             pat_py_keyword, boost::regex(pat_py_keyword), "\x05$1\x06"
         });
@@ -228,9 +229,10 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
             pat_js_comment, boost::regex(pat_js_comment), "\x03$1\x04"
         });
 
-        std::string pat_js_keyword = R"(\b(const|let|var|function|class|extends|return|if|)";
-        pat_js_keyword += R"(else|for|while|import|export|from|async|await|true|false|null|)";
-        pat_js_keyword += R"(undefined|this|new)\b)";
+        std::string pat_js_keyword = R"(\b(const|new|this|super|try|let|var|function|class|extends|return|if|)";
+        pat_js_keyword += R"(else|for|while|import|export|from|async|interface|type|catch|finally|await|true|false|null|)";
+        pat_js_keyword += R"(as|is|any|unknown|never|void|keyof|typeof|satisfies|yield|public|private|protected|readonly|static|implements|)";
+        pat_js_keyword += R"(undefined|this|new|console|log|switch|case|default|enum|namespace|module|break|continue|do|)\b)";
         lang_js.m_rules.push_back({
             pat_js_keyword, boost::regex(pat_js_keyword), "\x05$1\x06"
         });
@@ -345,8 +347,9 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
             pat_rust_comment, boost::regex(pat_rust_comment), "\x03$1\x04"
         });
 
-        std::string pat_rust_keyword = R"(\b(fn|let|mut|match|if|else|for|while|loop|return|)";
-        pat_rust_keyword += R"(struct|enum|impl|trait|pub|use|mod|move|async|await|true|false)\b)";
+        std::string pat_rust_keyword = R"(\b(fn|let|mut|const|static|ref|match|if|else|for|while|loop|return|)";
+        pat_rust_keyword += R"(type|continue|break|extern|where|dyn|Box|macro|try|)";
+        pat_rust_keyword += R"(struct|enum|impl|trait|pub|use|mod|loop|return|move|async|await|true|false)\b)";
         lang_rust.m_rules.push_back({
             pat_rust_keyword, boost::regex(pat_rust_keyword), "\x05$1\x06"
         });
