@@ -25,6 +25,11 @@ namespace malama::ui {
 
 wxDEFINE_EVENT(EVT_USER_PROMPT, wxCommandEvent);
 
+/**
+ * @brief Initializes the chat panel and registers theme updates.
+ *
+ * @param parent_ptr Parent window for the panel.
+ */
 ChatPanel::ChatPanel(wxWindow *parent_ptr)
     : wxPanel(parent_ptr, wxID_ANY) {
     SetBackgroundColour(wxColour(std::string(constants::color_dark_maroon)));
@@ -46,6 +51,11 @@ ChatPanel::ChatPanel(wxWindow *parent_ptr)
     });
 }
 
+/**
+ * @brief Creates and arranges the chat panel controls.
+ *
+ * Initializes the chat display, prompt input, and action buttons, then sets the panel sizer.
+ */
 void ChatPanel::setup_layout() noexcept {
     auto *main_sizer = new (std::nothrow) wxBoxSizer(wxVERTICAL);
     
@@ -99,6 +109,9 @@ void ChatPanel::setup_layout() noexcept {
     SetSizer(main_sizer);
 }
 
+/**
+ * @brief Binds the chat panel's UI events to their handlers.
+ */
 void ChatPanel::bind_events() noexcept {
     if (m_send_button_ptr != nullptr) {
         m_send_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_send_action, this);
@@ -114,7 +127,12 @@ void ChatPanel::bind_events() noexcept {
     }
 }
 
-void ChatPanel::render_chat_stream() noexcept {
+/**
+ * @brief Renders the chat history and active response stream.
+ *
+ * Updates the HTML chat display using the current theme colors and scrolls the view to show the latest content.
+ */
+auto ChatPanel::render_chat_stream() noexcept -> void {
     if (m_chat_display_ptr == nullptr) { 
         return; 
     }
@@ -146,7 +164,15 @@ void ChatPanel::append_token(std::string_view token_segment) noexcept {
     render_chat_stream();
 }
 
-void ChatPanel::append_user_message(std::string_view message) noexcept {
+/**
+ * @brief Appends a user message to the chat history.
+ *
+ * If an assistant response is currently streaming, it is preserved as the last completed response before the new
+ * user turn is added.
+ *
+ * @param message Message text to add.
+ */
+auto ChatPanel::append_user_message(std::string_view message) noexcept -> void {
     if (!m_active_response_stream.empty()) {
         m_last_llm_response = m_active_response_stream; 
         m_raw_markdown_history.push_back('\n');
@@ -161,6 +187,11 @@ void ChatPanel::append_user_message(std::string_view message) noexcept {
     render_chat_stream();
 }
 
+/**
+ * @brief Posts the current prompt as a user-submitted message.
+ *
+ * Clears the prompt input and emits an @c EVT_USER_PROMPT event containing the entered text.
+ */
 void ChatPanel::on_send_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     if (m_prompt_input_ptr == nullptr) { 
         return; 
@@ -180,6 +211,11 @@ void ChatPanel::on_send_action([[maybe_unused]] wxCommandEvent &event) noexcept 
     wxPostEvent(this, custom_event);
 }
 
+/**
+ * @brief Copies the current assistant response to the clipboard.
+ *
+ * Copies the in-progress streamed response when available, otherwise copies the most recent completed response.
+ */
 void ChatPanel::on_copy_action([[maybe_unused]] wxCommandEvent &event) noexcept {
     if (wxTheClipboard->Open()) {
         std::string text_to_copy = m_active_response_stream.empty() 
@@ -198,6 +234,11 @@ void ChatPanel::on_copy_action([[maybe_unused]] wxCommandEvent &event) noexcept 
     }
 }
 
+/**
+ * @brief Handles special code-copy and code-download links.
+ *
+ * @param event HTML link click event containing the clicked URL.
+ */
 void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
     wxString href = event.GetLinkInfo().GetHref();
     
@@ -251,6 +292,14 @@ void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
     }
 }
 
+/**
+ * @brief Loads a chat session into the conversation view.
+ *
+ * Clears the current display and replays the session messages into the chat
+ * history.
+ *
+ * @param session Chat session whose messages are rendered.
+ */
 void ChatPanel::load_history(const core::ChatSession& session) noexcept {
     m_raw_markdown_history = "### System Status\n`malama v0.2.4` initialized.\n\n---";
     m_active_response_stream.clear();
