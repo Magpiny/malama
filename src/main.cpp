@@ -36,7 +36,7 @@ public:
         spdlog::set_level(spdlog::level::debug);
         spdlog::info("Initializing malama v0.2.5 Production Persistence Engine...\n");
 
-        // Bootstrapping the configuration block from disk right at execution startup
+        // Bootstrap configuration state settings right at application boot time
         config::ConfigManager::get_instance().load_config("malama_config.json");
         const auto app_config = config::ConfigManager::get_instance().get_config();
 
@@ -76,7 +76,9 @@ public:
                         user_prompt,
                         std::vector<core::Message>{},
                         [](std::string_view parsed_token, bool is_final) mutable {
-                            auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN);
+                            auto *event_ptr = new (std::nothrow) wxThreadEvent(
+                                ui::EVT_MALAMA_TOKEN
+                            );
                             if (event_ptr != nullptr) {
                                 event_ptr->SetString(wxString::FromUTF8(
                                     parsed_token.data(), parsed_token.size()

@@ -14,12 +14,36 @@
 #include "config/config_manager.hpp"
 
 #include <spdlog/spdlog.h>
+#include <boost/asio.hpp>
+#include <glaze/glaze.hpp>
 #include <algorithm>
+#include <thread>
 
 namespace {
-// Thread-safe state tracking vector isolating reasoning streams per background worker
 thread_local bool g_in_thinking_block = false;
-}
+} // namespace
+
+namespace malama::network {
+
+struct OllamaGenerateRequest final {
+    std::string model{};
+    std::string prompt{};
+    bool stream{true};
+    bool think{false};
+};
+
+} // namespace malama::network
+
+template <>
+struct glz::meta<malama::network::OllamaGenerateRequest> {
+    using T = malama::network::OllamaGenerateRequest;
+    static constexpr auto value = object(
+        "model", &T::model,
+        "prompt", &T::prompt,
+        "stream", &T::stream,
+        "think", &T::think
+    );
+};
 
 namespace malama::network {
 
@@ -38,9 +62,81 @@ auto StreamWorker::InitializeGeneration(
 
     spdlog::debug("Stream worker target initialized for active model: {}", model_name);
 
-    m_client_ptr->SubmitPrompt(prompt_text, model_name, [this](std::string_view raw_chunk) {
-        IngestRawNetworkBytes(raw_chunk);
+    const auto app_config = config::ConfigManager::get_instance().get_config();
+    std::string host = app_config.m_engine.m_host;
+    std::string port = app_config.m_engine.m_port;
+    bool think_flag = app_config.m_engine.m_thinking_enabled;
+
+    std::jthread network_thread([this, host, port, model = std::string(model_name), 
+                                  prompt = std::string(prompt_text), think_flag]() {
+        try {
+            boost::asio::io_context io_ctx;
+            boost::asio::ip::tcp::resolver resolver(io_ctx);
+            auto endpoints = resolver.resolve(host, port);
+            
+            boost::asio::ip::tcp::socket socket(io_ctx);
+            boost::asio::connect(socket, endpoints);
+
+            OllamaGenerateRequest payload{
+                .model = model,
+                .prompt = prompt,
+                .stream = true,
+                .think = think_flag
+            };
+
+            std::string json_body;
+            // FIXED: Captured return value explicitly to appease [[nodiscard]] constraints
+            [[maybe_unused]] auto write_err = glz::write_json(payload, json_body);
+
+            std::string http_request = 
+                "POST /api/generate HTTP/1.1\r\n"
+                "Host: " + host + ":" + port + "\r\n"
+                "Content-Type: application/json\r\n"
+                "Content-Length: " + std::to_string(json_body.size()) + "\r\n"
+                "Connection: close\r\n\r\n" + json_body;
+
+            boost::asio::write(socket, boost::asio::buffer(http_request));
+
+            std::string response_accumulator;
+            char read_buffer[4096];
+            boost::system::error_code err_code;
+            bool headers_stripped = false;
+
+            while (true) {
+                std::size_t length = socket.read_some(
+                    boost::asio::buffer(read_buffer), err_code
+                );
+                if (length > 0) {
+                    if (!headers_stripped) {
+                        response_accumulator.append(read_buffer, length);
+                        std::size_t delimiter = response_accumulator.find("\r\n\r\n");
+                        if (delimiter != std::string::npos) {
+                            std::string_view remaining_payload(
+                                response_accumulator.data() + delimiter + 4, 
+                                response_accumulator.size() - (delimiter + 4)
+                            );
+                            headers_stripped = true;
+                            if (!remaining_payload.empty()) {
+                                IngestRawNetworkBytes(remaining_payload);
+                            }
+                        }
+                    } else {
+                        IngestRawNetworkBytes(std::string_view(read_buffer, length));
+                    }
+                }
+                if (err_code == boost::asio::error::eof || err_code) {
+                    break;
+                }
+            }
+        } catch (...) {
+            spdlog::error("Asynchronous network connection fault during streaming execution.");
+            if (m_token_callback) {
+                m_token_callback("", true);
+            }
+        }
     });
+    
+    network_thread.detach();
 }
 
 auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexcept -> void {

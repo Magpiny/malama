@@ -251,7 +251,10 @@ auto SettingsDialog::save_data() noexcept -> void {
 
 void SettingsDialog::on_save([[maybe_unused]] wxCommandEvent& event) noexcept {
     save_data();
-    EndModal(wxID_OK);
+    
+    CallAfter([this]() {
+        EndModal(wxID_OK);
+    });
 }
 
 void SettingsDialog::on_refresh_models([[maybe_unused]] wxCommandEvent& event) noexcept {
