@@ -53,6 +53,29 @@ auto Pipeline::process(std::string_view raw_markdown) const -> std::string {
 
 struct TokenizerState {
     std::vector<Token> m_tokens;
+
+    std::string m_current_buffer;
+    std::string m_code_lang;
+    bool m_in_code_block{false};
+
+    /**
+     * @brief Emits the buffered token, if any, and clears the buffer state.
+     *
+     * Creates a token from the current buffer content, assigns the given type,
+     * stores the captured language, and appends it to the token list.
+     *
+     * @param type Token type to assign to the buffered content.
+     */
+    void push_buffer_as(token_type type) {
+        if (!m_current_buffer.empty()) {
+            Token tok;
+            tok.m_type = type;
+            tok.m_content = m_current_buffer;
+            tok.m_language = m_code_lang;
+            m_tokens.push_back(tok);
+            m_current_buffer.clear();
+            m_code_lang.clear();
+
     std::string m_buffer;
     std::string m_language;
     bool m_in_block{false};
@@ -66,6 +89,7 @@ struct TokenizerState {
             m_tokens.push_back(token);
             m_buffer.clear();
             m_language.clear();
+
         }
     }
 };
@@ -151,8 +175,21 @@ static void evaluate_line_tokens(
     parse_markdown_elements(line_view, state);
 }
 
-// Fixes Issues 6 & 7: Made method static and eliminated pointer/iterator arithmetic completely
-auto Pipeline::tokenize(std::string_view text_content) -> std::vector<Token> {
+
+/**
+ * @brief Tokenizes markdown text into a sequence of block tokens.
+ *
+ * Splits the input into lines, applies markdown line classification, and preserves
+ * paragraph and code-block content across line boundaries.
+ *
+ * @param text Markdown source to tokenize.
+ * @return std::vector<Token> The generated token sequence.
+ */
+auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
+    TokenizeState state;
+    std::string_view remaining = text;
+  
+auto Pipeline::tokenize(std::string_view text) const -> std::vector<Token> {
     TokenizerState state;
     size_t current_position = local_constants::structural_zero_index;
     const size_t total_length = text_content.size();
@@ -196,6 +233,13 @@ auto Pipeline::decorate_inline_text(std::string_view text_content) const -> std:
     return processed;
 }
 
+/**
+ * @brief Renders a syntax-highlighted code block as HTML.
+ *
+ * @param code Source code to render.
+ * @param lang Language identifier used to select syntax rules.
+ * @return std::string HTML for the formatted code block, including copy and download actions.
+ */
 auto Pipeline::decorate_code_block(
     std::string_view code, 
     const std::string& lang
@@ -351,7 +395,7 @@ void Pipeline::handle_list(
     ListStatePair flags, 
     std::string_view list_tag
 ) const {
-    // .get() returns the underlying raw bool reference seamlessly
+    
     if (flags.m_is_alternative.get()) {
         html_output += (list_tag == local_constants::unordered_list_tag) ? "</ol><br>" : "</ul>";
         flags.m_is_alternative.get() = false;
@@ -375,7 +419,6 @@ void Pipeline::handle_code_block(const Token& token_ref, std::string& html_outpu
     html_output += decorate_code_block(token_ref.m_content, token_ref.m_language);
 }
 
-// Fixes Issue 2: Static handler method implementation
 void Pipeline::handle_divider(std::string& html_output) {
     html_output += local_constants::horizontal_rule_tag;
 }
@@ -484,6 +527,14 @@ auto Pipeline::scan_and_emit_table(
     current_idx = lookahead_idx;
     return true;
 }
+
+
+/**
+ * @brief Renders markdown tokens as HTML.
+ *
+ * @param tokens Token stream produced by the markdown tokenizer.
+ * @return std::string Rendered HTML.
+ */
 
 // -----------------------------------------------------------------------------
 auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
