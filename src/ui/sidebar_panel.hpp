@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/ui/sidebar_panel.hpp
 // Purpose:     Sidebar control mechanics and history navigation
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S.<samuelwanjare@protonmail.com>
 // Created:     2026-06-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -18,22 +18,23 @@ namespace malama::engine::storage { class HistoryManager; }
 namespace malama::ui {
 
 wxDECLARE_EVENT(EVT_LOAD_SESSION, wxCommandEvent);
-wxDECLARE_EVENT(EVT_NEW_CHAT_REQUESTED, wxCommandEvent); // NEW: Notify MainFrame to reset
+wxDECLARE_EVENT(EVT_NEW_CHAT_REQUESTED, wxCommandEvent);
 
 class SidebarPanel final : public wxPanel {
 public:
-    explicit SidebarPanel(wxWindow *parent_ptr, engine::storage::HistoryManager *history_manager_ptr = nullptr);
+    explicit SidebarPanel(
+        wxWindow *parent_ptr, 
+        engine::storage::HistoryManager *history_manager_ptr = nullptr
+    );
     ~SidebarPanel() override = default;
 
     SidebarPanel(const SidebarPanel &) = delete;
-    SidebarPanel &operator=(const SidebarPanel &) = delete;
+    auto operator=(const SidebarPanel &) -> SidebarPanel & = delete;
     SidebarPanel(SidebarPanel &&) noexcept = delete;
-    /**
- * @brief SidebarPanel cannot be move-assigned.
- */
-SidebarPanel &operator=(SidebarPanel &&) noexcept = delete;
+    auto operator=(SidebarPanel &&) noexcept -> SidebarPanel & = delete;
 
     void populate_sidebar() noexcept;
+    void select_session_by_id(const std::string& target_id) noexcept;
 
 private:
     void setup_layout() noexcept;
@@ -41,9 +42,9 @@ private:
 
     void on_session_selected(wxCommandEvent &event) noexcept;
     void on_context_menu(wxContextMenuEvent &event) noexcept;
-    void on_new_chat_click(wxCommandEvent &event) noexcept; // NEW: Private snake_case handler
+    void on_new_chat_click(wxCommandEvent &event) noexcept;
 
-    wxButton *m_new_chat_btn_ptr{nullptr}; // NEW: Button tracker
+    wxButton *m_new_chat_btn_ptr{nullptr};
     wxListBox *m_history_list_ptr{nullptr};
     engine::storage::HistoryManager *m_history_manager_ptr{nullptr};
     

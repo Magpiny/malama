@@ -36,15 +36,15 @@ ChatPanel::ChatPanel(wxWindow *parent_ptr)
     setup_layout();
     bind_events();
 
-    auto& confmgr = malama::config::ConfigManager::get_instance();
-    confmgr.register_observer([this](const malama::config::AppConfig& conf) {
-        this->SetBackgroundColour(wxColour(conf.m_appearance.m_bg_color));
+    auto& config_manager = malama::config::ConfigManager::get_instance();
+    config_manager.register_observer([this](const malama::config::AppConfig& config) {
+        this->SetBackgroundColour(wxColour(config.m_appearance.m_bg_color));
         if (m_prompt_input_ptr != nullptr) {
             m_prompt_input_ptr->SetBackgroundColour(
-                wxColour(conf.m_appearance.m_surface_color)
+                wxColour(config.m_appearance.m_surface_color)
             );
             m_prompt_input_ptr->SetForegroundColour(
-                wxColour(conf.m_appearance.m_text_primary)
+                wxColour(config.m_appearance.m_text_primary)
             );
         }
         this->Refresh();
@@ -63,7 +63,7 @@ void ChatPanel::setup_layout() noexcept {
         this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO
     );
     
-    m_raw_markdown_history = "### System Status\n`malama v0.1.1` initialized.\n\n---";
+    m_raw_markdown_history = "### System Status\n`malama v0.2.4` initialized.\n\n---";
     render_chat_stream();
 
     auto *action_bar_sizer = new (std::nothrow) wxBoxSizer(wxHORIZONTAL);
@@ -84,7 +84,6 @@ void ChatPanel::setup_layout() noexcept {
         wxBU_EXACTFIT | wxBORDER_NONE
     );
 
-    // Arranged layout sequence: Input bar (Left side stretch) -> Copy -> Send
     action_bar_sizer->Add(
         m_prompt_input_ptr, constants::layout_proportion_stretch, 
         wxALIGN_CENTER_VERTICAL | wxALL, constants::icon_button_margin
@@ -139,28 +138,28 @@ auto ChatPanel::render_chat_stream() noexcept -> void {
     }
 
     auto theme = malama::config::ConfigManager::get_instance().get_config().m_appearance;
-    malama::engine::markdown::Pipeline md_engine(theme);
+    malama::engine::markdown::Pipeline markdown_engine(theme);
 
     std::string composite_markdown = m_raw_markdown_history + "\n" + m_active_response_stream;
-    std::string html_body = md_engine.process(composite_markdown);
+    std::string html_body = markdown_engine.process(composite_markdown);
 
     std::string complete_html_document = 
-        "<html><body bgcolor=\"" + theme.m_bg_color + "\">"
-        "<font color=\"" + theme.m_text_primary + R"(" face="sans-serif">)"
-        + html_body + 
+        "<html><body bgcolor=\"" + theme.m_bg_color + "\">" +
+        "<font color=\"" + theme.m_text_primary + R"(" face="sans-serif">)" +
+        html_body + 
         "</font></body></html>";
 
     m_chat_display_ptr->SetPage(
         wxString::FromUTF8(complete_html_document.data(), complete_html_document.size())
     );
     
-    int x = 0;
-    int y = 0;
-    m_chat_display_ptr->GetViewStart(&x, &y);
-    m_chat_display_ptr->Scroll(x, y + 100);
+    int coord_x = 0;
+    int coord_y = 0;
+    m_chat_display_ptr->GetViewStart(&coord_x, &coord_y);
+    m_chat_display_ptr->Scroll(coord_x, coord_y + 100);
 }
 
-auto ChatPanel::append_token(std::string_view token_segment) noexcept -> void {
+void ChatPanel::append_token(std::string_view token_segment) noexcept {
     m_active_response_stream.append(token_segment.data(), token_segment.size());
     render_chat_stream();
 }
@@ -176,7 +175,9 @@ auto ChatPanel::append_token(std::string_view token_segment) noexcept -> void {
 auto ChatPanel::append_user_message(std::string_view message) noexcept -> void {
     if (!m_active_response_stream.empty()) {
         m_last_llm_response = m_active_response_stream; 
-        m_raw_markdown_history += "\n" + m_active_response_stream + "\n\n---";
+        m_raw_markdown_history.push_back('\n');
+        m_raw_markdown_history += m_active_response_stream;
+        m_raw_markdown_history += "\n\n---";
         m_active_response_stream.clear();
     }
 
@@ -246,12 +247,12 @@ void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
         std::string raw_code;
         std::string std_hex = hex_part.ToStdString();
         raw_code.reserve(std_hex.size() / 2);
-        for (size_t i = 0; i + 1 < std_hex.size(); i += 2) {
-            char high = std_hex[i];
-            char low = std_hex[i + 1];
-            int h = (high >= 'A') ? (high - 'A' + 10) : (high - '0');
-            int l = (low >= 'A') ? (low - 'A' + 10) : (low - '0');
-            raw_code.push_back(static_cast<char>((h << 4) | l));
+        for (size_t index = 0; index + 1 < std_hex.size(); index += 2) {
+            char high_nibble = std_hex[index];
+            char low_nibble = std_hex[index + 1];
+            int high_val = (high_nibble >= 'A') ? (high_nibble - 'A' + 10) : (high_nibble - '0');
+            int low_val = (low_nibble >= 'A') ? (low_nibble - 'A' + 10) : (low_nibble - '0');
+            raw_code.push_back(static_cast<char>((high_val << 4) | low_val));
         }
         if (wxTheClipboard->Open()) {
             auto *clipboard_data_ptr = new (std::nothrow) wxTextDataObject(
@@ -269,12 +270,12 @@ void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
         std::string raw_code;
         std::string std_hex = hex_part.ToStdString();
         raw_code.reserve(std_hex.size() / 2);
-        for (size_t i = 0; i + 1 < std_hex.size(); i += 2) {
-            char high = std_hex[i];
-            char low = std_hex[i + 1];
-            int h = (high >= 'A') ? (high - 'A' + 10) : (high - '0');
-            int l = (low >= 'A') ? (low - 'A' + 10) : (low - '0');
-            raw_code.push_back(static_cast<char>((h << 4) | l));
+        for (size_t index = 0; index + 1 < std_hex.size(); index += 2) {
+            char high_nibble = std_hex[index];
+            char low_nibble = std_hex[index + 1];
+            int high_val = (high_nibble >= 'A') ? (high_nibble - 'A' + 10) : (high_nibble - '0');
+            int low_val = (low_nibble >= 'A') ? (low_nibble - 'A' + 10) : (low_nibble - '0');
+            raw_code.push_back(static_cast<char>((high_val << 4) | low_val));
         }
         wxFileDialog saveFileDialog(this, "Save code block", "", "",
             "All files (*.*)|*.*", wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
@@ -300,17 +301,30 @@ void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
  * @param session Chat session whose messages are rendered.
  */
 void ChatPanel::load_history(const core::ChatSession& session) noexcept {
-    if (m_html_window_ptr != nullptr) {
-        m_html_window_ptr->SetPage(""); 
-    }
-    
-    for (const auto& msg : session.m_messages) {
-        if (msg.m_role == core::MessageRole::User) {
-            append_user_message(msg.m_content);
-        } else {
-            append_token(msg.m_content); 
+    m_raw_markdown_history = "### System Status\n`malama v0.2.4` initialized.\n\n---";
+    m_active_response_stream.clear();
+    m_last_llm_response.clear();
+
+    for (const auto& message : session.m_messages) {
+        if (message.m_role == core::MessageRole::User) {
+            m_raw_markdown_history += "\n\n### \U0001F464 User\n";
+            m_raw_markdown_history += message.m_content;
+        } else if (message.m_role == core::MessageRole::Assistant) {
+            m_raw_markdown_history += "\n\n### \U0001F916 malama\n";
+            m_raw_markdown_history += message.m_content;
+            m_raw_markdown_history += "\n\n---";
+            m_last_llm_response = message.m_content;
+        } else if (message.m_role == core::MessageRole::System) {
+            m_raw_markdown_history += "\n\n### \u2699\ufe0f System Context\n";
+            m_raw_markdown_history += message.m_content;
+            m_raw_markdown_history += "\n\n---";
         }
     }
+    render_chat_stream();
+}
+
+auto ChatPanel::get_active_response_stream() const noexcept -> std::string {
+    return m_active_response_stream;
 }
 
 } // namespace malama::ui

@@ -1,4 +1,15 @@
-#include "../include/config/config_manager.hpp"
+// /////////////////////////////////////////////////////////////////////////////
+// Name:        src/config/config_manager.cpp
+// Purpose:     Thread-safe configuration reflection architecture implementation
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
+// Created:     2026-06-12
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     GPL-3.0-or-later
+// /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+#include "config/config_manager.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -12,8 +23,12 @@ auto ConfigManager::get_instance() noexcept -> ConfigManager& {
 auto ConfigManager::load_config(const std::string& filepath) noexcept -> void {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::string buffer;
+    // Permissive layout flags prevent structural evolution from discarding elements
     if (auto err = glz::read_file_json(m_current_config, filepath, buffer)) {
-        // If file doesn't exist or is invalid, it falls back to the struct defaults
+        // Automatically rewrite updated binary defaults on standard parsing failures
+        [[maybe_unused]] auto write_err = glz::write_file_json(
+            m_current_config, filepath, buffer
+        );
     }
 }
 
@@ -33,7 +48,6 @@ auto ConfigManager::update_config(const AppConfig& new_config) noexcept -> void 
         std::lock_guard<std::mutex> lock(m_mutex);
         m_current_config = new_config;
     }
-    // Notify all listeners (UI components) that settings changed
     for (const auto& observer : m_observers) {
         observer(m_current_config);
     }
@@ -42,7 +56,6 @@ auto ConfigManager::update_config(const AppConfig& new_config) noexcept -> void 
 auto ConfigManager::register_observer(observer_callback callback) noexcept -> void {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_observers.push_back(std::move(callback));
-    // Immediately push current state to new observer
     m_observers.back()(m_current_config);
 }
 

@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/ui/main_frame.hpp
 // Purpose:     Top-level workspace frame containing native menu actions
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S<samuelwanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -36,15 +36,17 @@ public:
     ~MainFrame() override = default;
 
     MainFrame(const MainFrame &) = delete;
-    MainFrame &operator=(const MainFrame &) = delete;
+    auto operator=(const MainFrame &) -> MainFrame & = delete;
     MainFrame(MainFrame &&) noexcept = delete;
-    MainFrame &operator=(MainFrame &&) noexcept = delete;
+    auto operator=(MainFrame &&) noexcept -> MainFrame & = delete;
 
     auto AppendUserMessage(std::string_view message) noexcept -> void;
     auto AppendToken(std::string_view token_segment) noexcept -> void;
+    void FinalizeAssistantResponse() noexcept;
 
 private:
     void on_load_session(wxCommandEvent& event) noexcept;
+    void LoadMostRecentSessionOnStartup() noexcept;
 
     std::unique_ptr<engine::storage::HistoryManager> m_history_manager_ptr;
     std::string m_current_session_id; // Tracks what chat we are actively in
@@ -61,6 +63,7 @@ private:
     void on_licence_action([[maybe_unused]] wxCommandEvent &event) noexcept;
     void on_user_prompt_submitted(wxCommandEvent &event) noexcept;
     void on_new_chat_action(wxCommandEvent &event) noexcept;
+    void on_load_session_requested(wxCommandEvent& event) noexcept;
 
     enum class MenuId : std::uint16_t {
         PreferencesId = wxID_HIGHEST + 10,

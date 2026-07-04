@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/main.cpp
 // Purpose:     Main application entry point for malama native client
-// Author:      Wanjare <samuelwanjare@protonmail.com>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -15,37 +15,46 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 #include "common/constants.hpp"
+#include "config/config_manager.hpp"
 #include "network/ollama_client.hpp"
 #include "network/stream_worker.hpp"
 #include "ui/main_frame.hpp"
 
 namespace malama {
 
-class MalamaApp : public wxApp {
+class MalamaApp final : public wxApp {
 public:
     explicit MalamaApp() = default;
     ~MalamaApp() override = default;
 
     MalamaApp(const MalamaApp &) = delete;
-    MalamaApp &operator=(const MalamaApp &) = delete;
+    auto operator=(const MalamaApp &) -> MalamaApp & = delete;
     MalamaApp(MalamaApp &&) noexcept = delete;
-    MalamaApp &operator=(MalamaApp &&) noexcept = delete;
+    auto operator=(MalamaApp &&) noexcept -> MalamaApp & = delete;
 
     [[nodiscard]] bool OnInit() override {
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.2.1 MVP Interactivity Engine...\n");
+        spdlog::info("Initializing malama v0.2.5 Production Persistence Engine...\n");
+
+        // Bootstrap configuration state settings right at application boot time
+        config::ConfigManager::get_instance().load_config("malama_config.json");
+        const auto app_config = config::ConfigManager::get_instance().get_config();
 
         Bind(ui::EVT_MALAMA_TOKEN, &MalamaApp::OnTokenReceived, this);
 
         auto *raw_client_ptr = new (std::nothrow) network::OllamaClient(
-            std::string(constants::default_ollama_host),
-            std::string(constants::default_ollama_port)
+            app_config.m_engine.m_host,
+            app_config.m_engine.m_port
         );
-        if (raw_client_ptr == nullptr) {return false;}
+        if (raw_client_ptr == nullptr) {
+            return false;
+        }
         std::unique_ptr<network::OllamaClient> client_ptr(raw_client_ptr);
 
         auto *raw_worker_ptr = new (std::nothrow) network::StreamWorker(std::move(client_ptr));
-        if (raw_worker_ptr == nullptr) {return false;}
+        if (raw_worker_ptr == nullptr) {
+            return false;
+        }
         m_worker_ptr.reset(raw_worker_ptr);
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(
@@ -53,21 +62,28 @@ public:
             wxDefaultPosition,
             wxSize(constants::default_window_width, constants::default_window_height),
             [this](const std::string& user_prompt) mutable {
-
                 auto *current_frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
                 if (current_frame_ptr != nullptr) {
                     current_frame_ptr->AppendUserMessage(user_prompt);
                 }
 
                 if (m_worker_ptr != nullptr) {
+                    const auto current_config = 
+                        config::ConfigManager::get_instance().get_config();
+                    
                     m_worker_ptr->InitializeGeneration(
-                        constants::fallback_model_name,
+                        current_config.m_engine.m_active_model,
                         user_prompt,
-                        std::vector<common::Message>{},
-                        [](std::string_view parsed_token) mutable {
-                            auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN); // NOLINT
+                        std::vector<core::Message>{},
+                        [](std::string_view parsed_token, bool is_final) mutable {
+                            auto *event_ptr = new (std::nothrow) wxThreadEvent(
+                                ui::EVT_MALAMA_TOKEN
+                            );
                             if (event_ptr != nullptr) {
-                                event_ptr->SetString(wxString::FromUTF8(parsed_token.data(), parsed_token.size()));
+                                event_ptr->SetString(wxString::FromUTF8(
+                                    parsed_token.data(), parsed_token.size()
+                                ));
+                                event_ptr->SetInt(is_final ? 1 : 0);
                                 wxQueueEvent(wxTheApp, event_ptr);
                             }
                         }
@@ -88,7 +104,12 @@ private:
     void OnTokenReceived(wxThreadEvent& event) {
         auto* frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
         if (frame_ptr != nullptr) {
-            frame_ptr->AppendToken(event.GetString().ToStdString(wxConvUTF8));
+            bool is_final = event.GetInt() == 1;
+            if (is_final) {
+                frame_ptr->FinalizeAssistantResponse();
+            } else {
+                frame_ptr->AppendToken(event.GetString().ToStdString(wxConvUTF8));
+            }
         }
     }
 

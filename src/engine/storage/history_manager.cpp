@@ -1,27 +1,31 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/engine/storage/history_manager.cpp
-// Purpose:     Implements fast disk I/O and JSONL parsing for chat history
+// Purpose:     Implements thread-safe, transaction-locked queries for history
+// Author:      Wanjare S. <samuewanjare@protonmail.com>
+// Created:     2026-06-11
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include "engine/storage/history_manager.hpp"
-#include <fstream>
+#include <sqlite3.h>
 #include <chrono>
 #include <algorithm>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <glaze/glaze.hpp>
 
 namespace malama::engine::storage {
 
 HistoryManager::HistoryManager(std::filesystem::path storage_dir)
     : m_storage_dir(std::move(storage_dir)) {
-    
-    // Ensure the base directory exists
     if (!std::filesystem::exists(m_storage_dir)) {
         std::filesystem::create_directories(m_storage_dir);
     }
-    m_index_path = m_storage_dir / "sessions_index.json";
+    m_db_path = m_storage_dir / "history.db";
+    InitializeDatabase();
 }
 
 auto HistoryManager::GenerateUuidString() -> std::string {
@@ -30,173 +34,288 @@ auto HistoryManager::GenerateUuidString() -> std::string {
 }
 
 auto HistoryManager::GetCurrentEpoch() -> uint64_t {
-    return std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()
-    ).count();
+    auto time_point = std::chrono::system_clock::now().time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::seconds>(time_point).count();
 }
 
-auto HistoryManager::GetSessionFilePath(const std::string& id) const -> std::filesystem::path {
-    return m_storage_dir / (id + ".jsonl");
-}
-
-auto HistoryManager::LoadAllMetadata() const -> std::vector<core::SessionMetadata> {
-    std::vector<core::SessionMetadata> sessions;
-    if (std::filesystem::exists(m_index_path)) {
-        std::ifstream in(m_index_path);
-        if (in.is_open()) {
-            std::stringstream buffer;
-            buffer << in.rdbuf();
-            // Cast to void to satisfy your strict [[nodiscard]] compiler flag!
-            (void)glz::read_json(sessions, buffer.str());
-        }
+auto HistoryManager::InitializeDatabase() noexcept -> bool {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    
+    int result_code = sqlite3_open(m_db_path.c_str(), &m_db_handle);
+    if (result_code != SQLITE_OK) {
+        return false;
     }
-    return sessions;
+
+    const char* sql_sessions = 
+        "CREATE TABLE IF NOT EXISTS sessions ("
+        "session_id TEXT PRIMARY KEY, "
+        "title TEXT, "
+        "created_at INTEGER, "
+        "updated_at INTEGER, "
+        "is_pinned INTEGER DEFAULT 0);";
+
+    char* error_message = nullptr;
+    result_code = sqlite3_exec(m_db_handle, sql_sessions, nullptr, nullptr, &error_message);
+    if (result_code != SQLITE_OK) {
+        sqlite3_free(error_message);
+        return false;
+    }
+
+    const char* sql_messages = 
+        "CREATE TABLE IF NOT EXISTS messages ("
+        "message_id TEXT PRIMARY KEY, "
+        "session_id TEXT, "
+        "role INTEGER, "
+        "content TEXT, "
+        "timestamp INTEGER, "
+        "is_starred INTEGER DEFAULT 0, "
+        "FOREIGN KEY(session_id) REFERENCES sessions(session_id) ON DELETE CASCADE);";
+
+    result_code = sqlite3_exec(m_db_handle, sql_messages, nullptr, nullptr, &error_message);
+    if (result_code != SQLITE_OK) {
+        sqlite3_free(error_message);
+        return false;
+    }
+    return true;
 }
 
 auto HistoryManager::CreateSession(const std::string& initial_title) -> core::SessionMetadata {
-    core::SessionMetadata new_session;
-    new_session.m_session_id = GenerateUuidString();
-    new_session.m_title = initial_title;
-    new_session.m_updated_at = GetCurrentEpoch();
-    new_session.m_is_pinned = false;
+    std::lock_guard<std::mutex> lock(m_mutex);
+    
+    core::SessionMetadata metadata;
+    metadata.m_session_id = GenerateUuidString();
+    metadata.m_title = initial_title;
+    metadata.m_created_at = GetCurrentEpoch();
+    metadata.m_updated_at = metadata.m_created_at;
+    metadata.m_is_pinned = false;
 
-    // Load, Append, and Save Index
-    auto sessions = LoadAllMetadata();
-    sessions.push_back(new_session);
-    std::string buffer;
-    (void)glz::write_json(sessions, buffer); // (void) fixes the nodiscard error!
-    std::ofstream out(m_index_path, std::ios::trunc);
-    if (out.is_open()) { out << buffer; }
+    if (m_db_handle == nullptr) {
+        return metadata;
+    }
 
-    // Create the empty .jsonl file for the actual messages
-    std::ofstream touch_file(GetSessionFilePath(new_session.m_session_id));
-    return new_session;
+    const char* sql_insert = 
+        "INSERT INTO sessions (session_id, title, created_at, updated_at, is_pinned) "
+        "VALUES (?, ?, ?, ?, ?);";
+    
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_insert, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, metadata.m_session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(statement_ptr, 2, metadata.m_title.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(statement_ptr, 3, static_cast<sqlite3_int64>(metadata.m_created_at));
+        sqlite3_bind_int64(statement_ptr, 4, static_cast<sqlite3_int64>(metadata.m_updated_at));
+        sqlite3_bind_int(statement_ptr, 5, metadata.m_is_pinned ? 1 : 0);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
+    }
+    return metadata;
 }
 
 auto HistoryManager::DeleteSession(const std::string& session_id) -> void {
-    auto sessions = LoadAllMetadata();
-    std::erase_if(sessions, [&](const auto& session) {
-        return session.m_session_id == session_id;
-    });
-    
-  std::string buffer;
-    (void)glz::write_json(sessions, buffer); // (void) fixes the nodiscard error!
-    std::ofstream out(m_index_path, std::ios::trunc);
-    if (out.is_open()) { out << buffer; } 
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_db_handle == nullptr) {
+        return;
+    }
 
-    // Remove the actual chat data file
-    std::error_code ec;
-    std::filesystem::remove(GetSessionFilePath(session_id), ec);
+    const char* sql_delete = "DELETE FROM sessions WHERE session_id = ?;";
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_delete, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
+    }
 }
 
-auto HistoryManager::UpdateSessionTitle(const std::string& session_id, const std::string& new_title) -> void {
-    auto sessions = LoadAllMetadata();
-    for (auto& session : sessions) {
-        if (session.m_session_id == session_id) {
-            session.m_title = new_title;
-            session.m_updated_at = GetCurrentEpoch();
-            break;
-        }
+auto HistoryManager::UpdateSessionTitle(
+    const std::string& session_id, 
+    const std::string& new_title
+) -> void {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_db_handle == nullptr) {
+        return;
     }
-    std::string buffer;
-    (void)glz::write_json(sessions, buffer); // (void) fixes the nodiscard error!
-    std::ofstream out(m_index_path, std::ios::trunc);
-    if (out.is_open()) { out << buffer; }
+
+    const char* sql_update = "UPDATE sessions SET title = ?, updated_at = ? WHERE session_id = ?;";
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_update, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, new_title.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(statement_ptr, 2, static_cast<sqlite3_int64>(GetCurrentEpoch()));
+        sqlite3_bind_text(statement_ptr, 3, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
+    }
 }
 
 auto HistoryManager::ToggleSessionPin(const std::string& session_id) -> void {
-    auto sessions = LoadAllMetadata();
-    for (auto& session : sessions) {
-        if (session.m_session_id == session_id) {
-            session.m_is_pinned = !session.m_is_pinned;
-            break;
-        }
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_db_handle == nullptr) {
+        return;
     }
-    std::string buffer;
-    (void)glz::write_json(sessions, buffer); // (void) fixes the nodiscard error!
-    std::ofstream out(m_index_path, std::ios::trunc);
-    if (out.is_open()) { out << buffer; }
+
+    const char* sql_toggle = "UPDATE sessions SET is_pinned = NOT is_pinned WHERE session_id = ?;";
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_toggle, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
+    }
 }
 
-// Memory Profile: O(1) - Appends string natively without loading history into RAM
-auto HistoryManager::AppendMessage(const std::string& session_id, const core::Message& message) -> void {
-    std::string json_str;
-    (void)glz::write_json(message, json_str);
-
-    // Open in append mode (std::ios::app)
-    std::ofstream out(GetSessionFilePath(session_id), std::ios::app);
-    if (out.is_open()) {
-        out << json_str << "\n";
+auto HistoryManager::AppendMessage(
+    const std::string& session_id, 
+    const core::Message& message
+) -> void {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_db_handle == nullptr) {
+        return;
     }
 
-    // Update the 'updated_at' timestamp in the index so it floats to the top
-    auto sessions = LoadAllMetadata();
-    for (auto& session : sessions) {
-        if (session.m_session_id == session_id) {
-            session.m_updated_at = GetCurrentEpoch();
-            break;
-        }
-    }
-    std::string buffer;
-    (void)glz::write_json(sessions, buffer); // (void) fixes the nodiscard error!
-    std::ofstream outp(m_index_path, std::ios::trunc);
-    if (outp.is_open()) { outp << buffer; }
-}
-
-// Memory Profile: O(N) where N is number of messages. Uses stream buffering.
-auto HistoryManager::LoadSession(const std::string& session_id) const -> std::optional<core::ChatSession> {
-    core::ChatSession chat_session;
+    const char* sql_insert = 
+        "INSERT INTO messages (message_id, session_id, role, content, timestamp, is_starred) "
+        "VALUES (?, ?, ?, ?, ?, ?);";
     
-    // 1. Find Metadata
-    auto sessions = LoadAllMetadata();
-    auto it = std::find_if(sessions.begin(), sessions.end(), [&](const auto& s) {
-        return s.m_session_id == session_id;
-    });
-
-    if (it == sessions.end()) { return std::nullopt; }
-    chat_session.m_metadata = *it;
-
-    // 2. Stream JSONL File
-    std::ifstream in(GetSessionFilePath(session_id));
-    if (!in.is_open()) { return chat_session; } // Return empty session if no file yet
-
-    std::string line;
-    while (std::getline(in, line)) {
-        if (line.empty()) { continue;
-}
-        
-        core::Message msg;
-        auto ec = glz::read_json(msg, line);
-        if (!ec) {
-            chat_session.m_messages.push_back(std::move(msg));
-        }
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_insert, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        std::string msg_id = message.m_id.empty() ? GenerateUuidString() : message.m_id;
+        sqlite3_bind_text(statement_ptr, 1, msg_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(statement_ptr, 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int(statement_ptr, 3, static_cast<int>(message.m_role));
+        sqlite3_bind_text(statement_ptr, 4, message.m_content.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_int64(statement_ptr, 5, static_cast<sqlite3_int64>(message.m_timestamp));
+        sqlite3_bind_int(statement_ptr, 6, message.m_is_starred ? 1 : 0);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
     }
 
-    return chat_session;
+    const char* sql_touch = "UPDATE sessions SET updated_at = ? WHERE session_id = ?;";
+    if (sqlite3_prepare_v2(m_db_handle, sql_touch, -1, &statement_ptr, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int64(statement_ptr, 1, static_cast<sqlite3_int64>(GetCurrentEpoch()));
+        sqlite3_bind_text(statement_ptr, 2, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
+    }
 }
 
-// Needed to implement inline message starring
-auto HistoryManager::ToggleMessageStar(const std::string& session_id, const std::string& message_id) -> void {
-    auto session_opt = LoadSession(session_id);
-    if (!session_opt.has_value()) { return;
-}
-
-    auto& session = session_opt.value();
-    for (auto& msg : session.m_messages) {
-        if (msg.m_id == message_id) {
-            msg.m_is_starred = !msg.m_is_starred;
-            break;
-        }
+auto HistoryManager::ToggleMessageStar(
+    const std::string& session_id, 
+    const std::string& message_id
+) -> void {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_db_handle == nullptr) {
+        return;
     }
 
-    // Rewrite the JSONL file (Acceptable tradeoff since local chat logs are small files)
-    std::ofstream out(GetSessionFilePath(session_id), std::ios::trunc);
-    if (out.is_open()) {
-        for (const auto& msg : session.m_messages) {
-            std::string json_str;
-            (void)glz::write_json(msg, json_str);
-            out << json_str << "\n";
+    const char* sql_star = 
+        "UPDATE messages SET is_starred = NOT is_starred "
+        "WHERE session_id = ? AND message_id = ?;";
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_star, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(statement_ptr, 2, message_id.c_str(), -1, SQLITE_TRANSIENT);
+        sqlite3_step(statement_ptr);
+        sqlite3_finalize(statement_ptr);
+    }
+}
+
+auto HistoryManager::LoadAllMetadata() const -> std::vector<core::SessionMetadata> {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    std::vector<core::SessionMetadata> metadata_list;
+    if (m_db_handle == nullptr) {
+        return metadata_list;
+    }
+
+    const char* sql_select = 
+        "SELECT session_id, title, created_at, updated_at, is_pinned FROM sessions;";
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_select, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        while (sqlite3_step(statement_ptr) == SQLITE_ROW) {
+            core::SessionMetadata metadata;
+            metadata.m_session_id = 
+                reinterpret_cast<const char*>(sqlite3_column_text(statement_ptr, 0));
+            metadata.m_title = 
+                reinterpret_cast<const char*>(sqlite3_column_text(statement_ptr, 1));
+            metadata.m_created_at = static_cast<uint64_t>(sqlite3_column_int64(statement_ptr, 2));
+            metadata.m_updated_at = static_cast<uint64_t>(sqlite3_column_int64(statement_ptr, 3));
+            metadata.m_is_pinned = sqlite3_column_int(statement_ptr, 4) != 0;
+            metadata_list.push_back(metadata);
         }
+        sqlite3_finalize(statement_ptr);
+    }
+    return metadata_list;
+}
+
+auto HistoryManager::LoadSession(
+    const std::string& session_id
+) const -> std::optional<core::ChatSession> {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    core::ChatSession session_obj;
+    bool session_exists = false;
+
+    if (m_db_handle == nullptr) {
+        return std::nullopt;
+    }
+
+    const char* sql_session = 
+        "SELECT session_id, title, created_at, updated_at, is_pinned "
+        "FROM sessions WHERE session_id = ?;";
+    sqlite3_stmt* statement_ptr = nullptr;
+    int result_code = sqlite3_prepare_v2(m_db_handle, sql_session, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        if (sqlite3_step(statement_ptr) == SQLITE_ROW) {
+            session_obj.m_metadata.m_session_id = 
+                reinterpret_cast<const char*>(sqlite3_column_text(statement_ptr, 0));
+            session_obj.m_metadata.m_title = 
+                reinterpret_cast<const char*>(sqlite3_column_text(statement_ptr, 1));
+            session_obj.m_metadata.m_created_at = 
+                static_cast<uint64_t>(sqlite3_column_int64(statement_ptr, 2));
+            session_obj.m_metadata.m_updated_at = 
+                static_cast<uint64_t>(sqlite3_column_int64(statement_ptr, 3));
+            session_obj.m_metadata.m_is_pinned = sqlite3_column_int(statement_ptr, 4) != 0;
+            session_exists = true;
+        }
+        sqlite3_finalize(statement_ptr);
+    }
+
+    if (!session_exists) {
+        return std::nullopt;
+    }
+
+    const char* sql_messages = 
+        "SELECT message_id, role, content, timestamp, is_starred "
+        "FROM messages WHERE session_id = ? ORDER BY timestamp ASC;";
+    result_code = sqlite3_prepare_v2(m_db_handle, sql_messages, -1, &statement_ptr, nullptr);
+    if (result_code == SQLITE_OK) {
+        sqlite3_bind_text(statement_ptr, 1, session_id.c_str(), -1, SQLITE_TRANSIENT);
+        while (sqlite3_step(statement_ptr) == SQLITE_ROW) {
+            core::Message message_obj;
+            message_obj.m_id = 
+                reinterpret_cast<const char*>(sqlite3_column_text(statement_ptr, 0));
+            message_obj.m_role = 
+                static_cast<core::MessageRole>(sqlite3_column_int(statement_ptr, 1));
+            message_obj.m_content = 
+                reinterpret_cast<const char*>(sqlite3_column_text(statement_ptr, 2));
+            message_obj.m_timestamp = 
+                static_cast<uint64_t>(sqlite3_column_int64(statement_ptr, 3));
+            message_obj.m_is_starred = sqlite3_column_int(statement_ptr, 4) != 0;
+            session_obj.m_messages.push_back(message_obj);
+        }
+        sqlite3_finalize(statement_ptr);
+    }
+    return session_obj;
+}
+
+HistoryManager::~HistoryManager() {
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_db_handle != nullptr) {
+        sqlite3_close(m_db_handle);
+        m_db_handle = nullptr;
     }
 }
 

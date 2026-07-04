@@ -1,9 +1,24 @@
+// /////////////////////////////////////////////////////////////////////////////
+// Name:        include/ui/settings_dialog.hpp
+// Purpose:     Preferences modal layout configuration for dynamic engines
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
+// Created:     2026-06-12
+// Copyright:   (c) 2026 Magpiny. All rights reserved.
+// Licence:     GPL-3.0-or-later
+// /////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 
 #include <wx/dialog.h>
 #include <wx/notebook.h>
 #include <wx/textctrl.h>
 #include <wx/spinctrl.h>
+#include <wx/choice.h>
+#include <wx/checkbox.h>
+#include <wx/stattext.h>
+#include <wx/button.h>
+#include <string>
+#include <vector>
 #include "config/config_manager.hpp"
 
 namespace malama::ui {
@@ -18,15 +33,23 @@ private:
     auto populate_data() noexcept -> void;
     auto save_data() noexcept -> void;
     void on_save([[maybe_unused]] wxCommandEvent& event) noexcept;
+    void on_refresh_models([[maybe_unused]] wxCommandEvent& event) noexcept;
+    [[nodiscard]] auto fetch_local_models(
+        const std::string& host, 
+        const std::string& port
+    ) noexcept -> std::vector<std::string>;
 
     wxNotebook* m_notebook_ptr{nullptr};
     
-    // Engine Tab
+    // Engine Tab controls
     wxTextCtrl* m_host_input_ptr{nullptr};
     wxTextCtrl* m_port_input_ptr{nullptr};
-    wxTextCtrl* m_model_input_ptr{nullptr};
+    wxChoice* m_model_choice_ptr{nullptr};
+    wxButton* m_refresh_btn_ptr{nullptr};
+    wxStaticText* m_status_label_ptr{nullptr};
+    wxCheckBox* m_thinking_check_ptr{nullptr}; // Advanced flag checkbox controller
 
-    // Interaction Tab
+    // Interaction Tab controls
     wxSpinCtrl* m_delay_spin_ptr{nullptr};
 
     config::AppConfig m_local_config;
