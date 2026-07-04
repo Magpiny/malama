@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/main.cpp
 // Purpose:     Main application entry point for malama native client
-// Author:      Wanjare <samuelwanjare@protonmail.com>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -15,6 +15,7 @@
 #include <vector>
 #include <spdlog/spdlog.h>
 #include "common/constants.hpp"
+#include "config/config_manager.hpp"
 #include "network/ollama_client.hpp"
 #include "network/stream_worker.hpp"
 #include "ui/main_frame.hpp"
@@ -33,13 +34,17 @@ public:
 
     [[nodiscard]] bool OnInit() override {
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.2.4 Production Persistence Engine...\n");
+        spdlog::info("Initializing malama v0.2.5 Production Persistence Engine...\n");
+
+        // Bootstrap configuration state settings right at application boot time
+        config::ConfigManager::get_instance().load_config("malama_config.json");
+        const auto app_config = config::ConfigManager::get_instance().get_config();
 
         Bind(ui::EVT_MALAMA_TOKEN, &MalamaApp::OnTokenReceived, this);
 
         auto *raw_client_ptr = new (std::nothrow) network::OllamaClient(
-            std::string(constants::default_ollama_host),
-            std::string(constants::default_ollama_port)
+            app_config.m_engine.m_host,
+            app_config.m_engine.m_port
         );
         if (raw_client_ptr == nullptr) {
             return false;
@@ -63,17 +68,21 @@ public:
                 }
 
                 if (m_worker_ptr != nullptr) {
+                    const auto current_config = 
+                        config::ConfigManager::get_instance().get_config();
+                    
                     m_worker_ptr->InitializeGeneration(
-                        constants::fallback_model_name,
+                        current_config.m_engine.m_active_model,
                         user_prompt,
                         std::vector<core::Message>{},
                         [](std::string_view parsed_token, bool is_final) mutable {
-                            auto *event_ptr = new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN);
+                            auto *event_ptr = new (std::nothrow) wxThreadEvent(
+                                ui::EVT_MALAMA_TOKEN
+                            );
                             if (event_ptr != nullptr) {
                                 event_ptr->SetString(wxString::FromUTF8(
                                     parsed_token.data(), parsed_token.size()
                                 ));
-                                // Safe state flag assignment: 1 means streaming finished
                                 event_ptr->SetInt(is_final ? 1 : 0);
                                 wxQueueEvent(wxTheApp, event_ptr);
                             }

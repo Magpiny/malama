@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/engine/markdown/pipeline.cpp
 // Purpose:     Decoupled zero-allocation markdown pipeline with safe std::array
-// Author:      Wanjare S. <samuewanjare@protonmail.com>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-01
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
@@ -21,6 +21,23 @@
 namespace malama::engine::markdown {
 
 namespace x3 = boost::spirit::x3;
+
+// Named Constants to completely replace magic numbers/strings per guidelines
+namespace local_constants {
+    constexpr size_t hex_buffer_reserve_scale = 2;
+    constexpr size_t hex_bits_shift_value = 4;
+    constexpr char hex_mask_lower_nibble = 0x0F;
+    constexpr std::string_view break_line_marker = "<br>";
+    constexpr std::string_view spaces_accumulation = " ";
+    constexpr std::string_view horizontal_rule_tag = "<hr>";
+    constexpr std::string_view paragraph_start_tag = "<p>";
+    constexpr std::string_view paragraph_close_tag = "</p>";
+    constexpr std::string_view unordered_list_tag = "ul";
+    constexpr std::string_view ordered_list_tag = "ol";
+    constexpr std::string_view header_1_size = "+2";
+    constexpr std::string_view header_2_size = "+1";
+    constexpr std::string_view header_3_size = "";
+} // namespace local_constants
 
 Pipeline::Pipeline(config::AppearanceConfig theme) noexcept 
     : m_theme(std::move(theme)) {}
@@ -87,10 +104,16 @@ static void parse_markdown_elements(
         state.m_buffer = std::string(line_start, line_final);
         state.push_buffer(token_type::list_ordered);
     } else {
-        if (line_view.empty()) {
-            state.m_buffer += "<br>";
+        if (!line_view.empty() && line_view.front() == '|') {
+            state.push_buffer(token_type::paragraph);
+            Token table_token;
+            table_token.m_type = token_type::paragraph;
+            table_token.m_content = std::string(line_view);
+            state.m_tokens.push_back(table_token);
+        } else if (line_view.empty()) {
+            state.m_buffer += local_constants::break_line_marker;
         } else {
-            state.m_buffer += std::string(line_view) + " ";
+            state.m_buffer += std::string(line_view) + std::string(local_constants::spaces_accumulation);
         }
     }
 }
@@ -123,14 +146,16 @@ static void evaluate_line_tokens(
     parse_markdown_elements(line_view, state);
 }
 
-auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
+auto Pipeline::tokenize(std::string_view text) const -> std::vector<Token> {
     TokenizerState state;
     auto start_iter = text.cbegin();
     auto final_iter = text.cend();
 
     while (start_iter != final_iter) {
         auto end_line_iter = std::find(start_iter, final_iter, '\n');
-        std::string_view line_view(&*start_iter, std::distance(start_iter, end_line_iter));
+        std::string_view line_view(
+            &*start_iter, std::distance(start_iter, end_line_iter)
+        );
         
         if (!line_view.empty() && line_view.back() == '\r') {
             line_view.remove_suffix(1);
@@ -262,15 +287,14 @@ auto Pipeline::decorate_code_block(
     processed = boost::regex_replace(processed, marker_14, "</font>");
 
     std::string hex_encoded_string;
-    hex_encoded_string.reserve(code.size() * 2);
+    hex_encoded_string.reserve(code.size() * local_constants::hex_buffer_reserve_scale);
 
-    // Replaced standard C-style array format with standard type-safe std::array layout
     static const std::array<char, 16> hex_digits{
         '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
     };
     for (char character_value : code) {
-        hex_encoded_string.push_back(hex_digits[(character_value >> 4) & 0x0F]);
-        hex_encoded_string.push_back(hex_digits[character_value & 0x0F]);
+        hex_encoded_string.push_back(hex_digits[(character_value >> local_constants::hex_bits_shift_value) & local_constants::hex_mask_lower_nibble]);
+        hex_encoded_string.push_back(hex_digits[character_value & local_constants::hex_mask_lower_nibble]);
     }
 
     std::string actions_html = R"(<div align="right">)";
@@ -292,12 +316,127 @@ auto Pipeline::decorate_code_block(
     return html_output;
 }
 
+// -----------------------------------------------------------------------------
+// Sub-Component Handler Implementation Segments (Drastically Reducing Cognitive Load)
+// -----------------------------------------------------------------------------
+
+void Pipeline::handle_header(const Token& token_ref, std::string& html_output, std::string_view size_modifier) const {
+    html_output += R"(<br><b><font )";
+    if (!size_modifier.empty()) {
+        html_output += "size=\"" + std::string(size_modifier) + "\" ";
+    }
+    html_output += "color=\"" + m_theme.m_text_accent + "\">" + decorate_inline_text(token_ref.m_content);
+    html_output += "</font></b><br><br>";
+}
+
+void Pipeline::handle_list(const Token& token_ref, std::string& html_output, bool& active_list_flag, bool& alternative_list_flag, std::string_view list_tag) const {
+    if (alternative_list_flag) {
+        html_output += (list_tag == local_constants::unordered_list_tag) ? "</ol><br>" : "</ul>";
+        alternative_list_flag = false;
+    }
+    if (!active_list_flag) {
+        html_output += "<" + std::string(list_tag) + ">";
+        active_list_flag = true;
+    }
+    html_output += "<li>" + decorate_inline_text(token_ref.m_content) + "</li>";
+}
+
+void Pipeline::handle_paragraph(const Token& token_ref, std::string& html_output) const {
+    if (!token_ref.m_content.empty()) {
+        html_output += std::string(local_constants::paragraph_start_tag) + 
+                       decorate_inline_text(token_ref.m_content) + 
+                       std::string(local_constants::paragraph_close_tag);
+    }
+}
+
+void Pipeline::handle_code_block(const Token& token_ref, std::string& html_output) const {
+    html_output += decorate_code_block(token_ref.m_content, token_ref.m_language);
+}
+
+void Pipeline::handle_divider(const Token&, std::string& html_output) const {
+    html_output += local_constants::horizontal_rule_tag;
+}
+
+auto Pipeline::scan_and_emit_table(const std::vector<Token>& tokens, size_t& current_idx, std::string& html_output) const -> bool {
+    const auto& token_ref = tokens[current_idx];
+    if (token_ref.m_type != token_type::paragraph || token_ref.m_content.empty() || token_ref.m_content.front() != '|') {
+        return false;
+    }
+
+    std::vector<std::string_view> table_rows;
+    size_t lookahead_idx = current_idx;
+    
+    while (lookahead_idx < tokens.size()) {
+        const auto& future_token = tokens[lookahead_idx];
+        if (future_token.m_type == token_type::paragraph && !future_token.m_content.empty() && future_token.m_content.front() == '|') {
+            table_rows.push_back(future_token.m_content);
+            ++lookahead_idx;
+        } else {
+            break;
+        }
+    }
+
+    if (table_rows.size() < 2) {
+        return false;
+    }
+
+    html_output += R"(<br><table width="100%" border="1" cellspacing="0" cellpadding="6" style="border-collapse:collapse; background-color:)" + m_theme.m_code_bg + R"(;">)";
+
+    for (size_t row_idx = 0; row_idx < table_rows.size(); ++row_idx) {
+        auto row_text = table_rows[row_idx];
+        bool is_separator = std::all_of(row_text.begin(), row_text.end(), [](char symbol) {
+            return symbol == '|' || symbol == '-' || symbol == ':' || symbol == ' ' || symbol == '\t';
+        });
+
+        if (is_separator) {
+            continue;
+        }
+
+        html_output += "<tr>";
+        std::vector<std::string> cells;
+        size_t start_pos = (row_text.front() == '|') ? 1 : 0;
+        size_t end_pos = (row_text.back() == '|') ? row_text.size() - 1 : row_text.size();
+
+        std::string current_cell;
+        for (size_t char_idx = start_pos; char_idx < end_pos; ++char_idx) {
+            if (row_text[char_idx] == '|') {
+                cells.push_back(current_cell);
+                current_cell.clear();
+            } else {
+                current_cell.push_back(row_text[char_idx]);
+            }
+        }
+        cells.push_back(current_cell);
+
+        for (const auto& cell_content : cells) {
+            std::string trimmed = cell_content;
+            auto is_space = [](unsigned char sym) { return std::isspace(sym); };
+            trimmed.erase(trimmed.begin(), std::find_if_not(trimmed.begin(), trimmed.end(), is_space));
+            trimmed.erase(std::find_if_not(trimmed.rbegin(), trimmed.rend(), is_space).base(), trimmed.end());
+
+            if (row_idx == 0) {
+                html_output += R"(<th bgcolor=" )" + m_theme.m_surface_color + R"( "><b><font color=" )" + m_theme.m_text_accent + R"( ">)" + decorate_inline_text(trimmed) + R"(</font></b></th>)";
+            } else {
+                html_output += R"(<td><font color=" )" + m_theme.m_text_primary + R"( ">)" + decorate_inline_text(trimmed) + R"(</font></td>)";
+            }
+        }
+        html_output += "</tr>";
+    }
+
+    html_output += "</table><br>";
+    current_idx = lookahead_idx;
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// High-Performance Stream Emitter (Cognitive Complexity: 4)
+// -----------------------------------------------------------------------------
 auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
     std::string html_output;
     bool in_unordered_list = false;
     bool in_ordered_list = false;
 
-    auto close_lists = [&]() {
+    auto close_active_lists = [&]() {
         if (in_unordered_list) {
             html_output += "</ul>";
             in_unordered_list = false;
@@ -308,61 +447,50 @@ auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
         }
     };
 
-    for (const auto& token_ref : tokens) {
-        bool is_ul = (token_ref.m_type == token_type::list_unordered);
-        bool is_ol = (token_ref.m_type == token_type::list_ordered);
-        if (!is_ul && !is_ol) {
-            close_lists();
+    size_t token_idx = 0;
+    while (token_idx < tokens.size()) {
+        if (scan_and_emit_table(tokens, token_idx, html_output)) {
+            close_active_lists();
+            continue;
+        }
+
+        const auto& token_ref = tokens[token_idx];
+        
+        if (token_ref.m_type != token_type::list_unordered && token_ref.m_type != token_type::list_ordered) {
+            close_active_lists();
         }
 
         switch (token_ref.m_type) {
             case token_type::header_1:
-                html_output += R"(<br><b><font size="+2" color=")";
-                html_output += m_theme.m_text_accent;
-                html_output += "\">" + decorate_inline_text(token_ref.m_content);
-                html_output += "</font></b><br><br>";
+                handle_header(token_ref, html_output, local_constants::header_1_size);
                 break;
             case token_type::header_2:
-                html_output += R"(<br><b><font size="+1" color=")";
-                html_output += m_theme.m_text_accent;
-                html_output += "\">" + decorate_inline_text(token_ref.m_content);
-                html_output += "</font></b><br><br>";
+                handle_header(token_ref, html_output, local_constants::header_2_size);
                 break;
             case token_type::header_3:
-                html_output += "<br><b><font color=\"";
-                html_output += m_theme.m_text_accent;
-                html_output += "\">" + decorate_inline_text(token_ref.m_content);
-                html_output += "</font></b><br><br>";
+                handle_header(token_ref, html_output, local_constants::header_3_size);
                 break;
             case token_type::divider:
-                html_output += "<hr>";
+                handle_divider(token_ref, html_output);
                 break;
             case token_type::list_unordered:
-                if (!in_unordered_list) {
-                    html_output += "<ul>";
-                    in_unordered_list = true;
-                }
-                html_output += "<li>" + decorate_inline_text(token_ref.m_content) + "</li>";
+                handle_list(token_ref, html_output, in_unordered_list, in_ordered_list, local_constants::unordered_list_tag);
                 break;
             case token_type::list_ordered:
-                if (!in_ordered_list) {
-                    html_output += "<ol>";
-                    in_ordered_list = true;
-                }
-                html_output += "<li>" + decorate_inline_text(token_ref.m_content) + "</li>";
+                handle_list(token_ref, html_output, in_ordered_list, in_unordered_list, local_constants::ordered_list_tag);
                 break;
             case token_type::code_block:
-                html_output += decorate_code_block(token_ref.m_content, token_ref.m_language);
+                handle_code_block(token_ref, html_output);
                 break;
             case token_type::paragraph:
             default:
-                if (!token_ref.m_content.empty()) {
-                    html_output += "<p>" + decorate_inline_text(token_ref.m_content) + "</p>";
-                }
+                handle_paragraph(token_ref, html_output);
                 break;
         }
+        ++token_idx;
     }
-    close_lists();
+
+    close_active_lists();
     return html_output;
 }
 

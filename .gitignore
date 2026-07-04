@@ -5,4 +5,5 @@ libs
 build_arch
 build_fedora
 build_ubuntu
+malama_config.json
 
