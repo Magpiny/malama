@@ -145,6 +145,8 @@ Malama targets native Linux only.
 | [SQLite3](https://sqlite.org) | any stable | Persistent conversation storage |
 | [Boost.Asio](https://boost.org) | ≥ 1.74 | Async TCP streaming to Ollama |
 | [Boost.UUID](https://boost.org) | ≥ 1.74 | Session identifiers |
+| [Boost.Spirit X3](https://boost.org) | ≥ 1.74 | Compile-time PEG parser for the Markdown pipeline |
+| [Boost.Regex](https://boost.org) | ≥ 1.74 | Pattern matching for the syntax highlighting engine |
 | [spdlog](https://github.com/gabime/spdlog) | ≥ 1.12 | Structured logging |
 | [glaze](https://github.com/stephenberry/glaze) | ≥ 2.0 | Compile-time JSON reflection |
 
@@ -269,5 +271,5 @@ without restarting the current session.
 ---
 
 <div align="center">
-  <sub>Built with C++23 · wxWidgets · Boost.Asio · SQLite3 · glaze · spdlog</sub>
+  <sub>Built with C++23 · wxWidgets · Boost.Asio · Boost.Spirit(X3) - Boost.Regex - SQLite3 · glaze · spdlog</sub>
 </div>
