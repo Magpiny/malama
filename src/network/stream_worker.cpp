@@ -10,18 +10,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "network/stream_worker.hpp"
-#include "network/ollama_chunks.hpp"
-#include "config/config_manager.hpp"
 
-#include <spdlog/spdlog.h>
+#include <algorithm>
 #include <boost/asio.hpp>
 #include <glaze/glaze.hpp>
-#include <algorithm>
+#include <spdlog/spdlog.h>
 #include <thread>
+
+#include "config/config_manager.hpp"
+#include "network/ollama_chunks.hpp"
 
 namespace {
 thread_local bool g_in_thinking_block = false;
-} // namespace
+}  // namespace
 
 namespace malama::network {
 
@@ -32,17 +33,13 @@ struct OllamaGenerateRequest final {
     bool think{false};
 };
 
-} // namespace malama::network
+}  // namespace malama::network
 
-template <>
+template<>
 struct glz::meta<malama::network::OllamaGenerateRequest> {
     using T = malama::network::OllamaGenerateRequest;
-    static constexpr auto value = object(
-        "model", &T::model,
-        "prompt", &T::prompt,
-        "stream", &T::stream,
-        "think", &T::think
-    );
+    static constexpr auto value =
+        object("model", &T::model, "prompt", &T::prompt, "stream", &T::stream, "think", &T::think);
 };
 
 namespace malama::network {
@@ -51,11 +48,9 @@ StreamWorker::StreamWorker(std::unique_ptr<OllamaClient> client_ptr) noexcept
     : m_client_ptr(std::move(client_ptr)) {}
 
 auto StreamWorker::InitializeGeneration(
-    std::string_view model_name,
-    std::string_view prompt_text,
+    std::string_view model_name, std::string_view prompt_text,
     [[maybe_unused]] const std::vector<core::Message> &history_context,
-    std::function<void(std::string_view, bool)> token_callback
-) noexcept -> void {
+    std::function<void(std::string_view, bool)> token_callback) noexcept -> void {
     m_token_callback = std::move(token_callback);
     m_residual_buffer.clear();
     g_in_thinking_block = false;
@@ -67,33 +62,34 @@ auto StreamWorker::InitializeGeneration(
     std::string port = app_config.m_engine.m_port;
     bool think_flag = app_config.m_engine.m_thinking_enabled;
 
-    std::jthread network_thread([this, host, port, model = std::string(model_name), 
-                                  prompt = std::string(prompt_text), think_flag]() {
+    std::jthread network_thread([this, host, port, model = std::string(model_name),
+                                 prompt = std::string(prompt_text), think_flag]() {
         try {
             boost::asio::io_context io_ctx;
             boost::asio::ip::tcp::resolver resolver(io_ctx);
             auto endpoints = resolver.resolve(host, port);
-            
+
             boost::asio::ip::tcp::socket socket(io_ctx);
             boost::asio::connect(socket, endpoints);
 
             OllamaGenerateRequest payload{
-                .model = model,
-                .prompt = prompt,
-                .stream = true,
-                .think = think_flag
-            };
+                .model = model, .prompt = prompt, .stream = true, .think = think_flag};
 
             std::string json_body;
             // FIXED: Captured return value explicitly to appease [[nodiscard]] constraints
             [[maybe_unused]] auto write_err = glz::write_json(payload, json_body);
 
-            std::string http_request = 
+            std::string http_request =
                 "POST /api/generate HTTP/1.1\r\n"
-                "Host: " + host + ":" + port + "\r\n"
+                "Host: " +
+                host + ":" + port +
+                "\r\n"
                 "Content-Type: application/json\r\n"
-                "Content-Length: " + std::to_string(json_body.size()) + "\r\n"
-                "Connection: close\r\n\r\n" + json_body;
+                "Content-Length: " +
+                std::to_string(json_body.size()) +
+                "\r\n"
+                "Connection: close\r\n\r\n" +
+                json_body;
 
             boost::asio::write(socket, boost::asio::buffer(http_request));
 
@@ -103,18 +99,15 @@ auto StreamWorker::InitializeGeneration(
             bool headers_stripped = false;
 
             while (true) {
-                std::size_t length = socket.read_some(
-                    boost::asio::buffer(read_buffer), err_code
-                );
+                std::size_t length = socket.read_some(boost::asio::buffer(read_buffer), err_code);
                 if (length > 0) {
                     if (!headers_stripped) {
                         response_accumulator.append(read_buffer, length);
                         std::size_t delimiter = response_accumulator.find("\r\n\r\n");
                         if (delimiter != std::string::npos) {
                             std::string_view remaining_payload(
-                                response_accumulator.data() + delimiter + 4, 
-                                response_accumulator.size() - (delimiter + 4)
-                            );
+                                response_accumulator.data() + delimiter + 4,
+                                response_accumulator.size() - (delimiter + 4));
                             headers_stripped = true;
                             if (!remaining_payload.empty()) {
                                 IngestRawNetworkBytes(remaining_payload);
@@ -135,7 +128,7 @@ auto StreamWorker::InitializeGeneration(
             }
         }
     });
-    
+
     network_thread.detach();
 }
 
@@ -145,8 +138,7 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
     }
 
     try {
-        const std::size_t allowed = 
-            constants::absolute_max_buffer_bytes - m_residual_buffer.size();
+        const std::size_t allowed = constants::absolute_max_buffer_bytes - m_residual_buffer.size();
         if (allowed == 0) {
             spdlog::warn("Residual buffer limit reached; flushing allocation frame context.");
             m_residual_buffer.clear();
@@ -167,22 +159,20 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
     while ((newline_position = processing_view.find('\n')) != std::string_view::npos) {
         std::string_view current_line = processing_view.substr(0, newline_position);
         processing_view.remove_prefix(newline_position + 1);
-        
+
         if (!current_line.empty() && current_line.back() == '\r') {
             current_line.remove_suffix(1);
         }
 
         if (!current_line.empty() && current_line.front() == '{') {
             OllamaGenerateChunk parsed_chunk{};
-            
-            const auto execution_error = glz::read<glz::opts{.error_on_unknown_keys = false}>(
-                parsed_chunk, current_line
-            );
-            
+
+            const auto execution_error =
+                glz::read<glz::opts{.error_on_unknown_keys = false}>(parsed_chunk, current_line);
+
             if (!execution_error) [[likely]] {
                 if (!parsed_chunk.response.empty()) {
-                    const auto runtime_config = 
-                        config::ConfigManager::get_instance().get_config();
+                    const auto runtime_config = config::ConfigManager::get_instance().get_config();
 
                     if (!runtime_config.m_engine.m_thinking_enabled) {
                         std::string token_str = parsed_chunk.response;
@@ -196,7 +186,7 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
                             }
                             token_str = token_str.substr(position + 7);
                         }
-                        
+
                         if (g_in_thinking_block) {
                             if (token_str.find("</think>") != std::string::npos) {
                                 g_in_thinking_block = false;
@@ -220,10 +210,8 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
                     m_token_callback("", true);
                 }
             } else {
-                spdlog::warn(
-                    "Glaze parser discarded corrupted frame segment. Error code: {}", 
-                    static_cast<int>(execution_error.ec)
-                );
+                spdlog::warn("Glaze parser discarded corrupted frame segment. Error code: {}",
+                             static_cast<int>(execution_error.ec));
             }
         }
     }
@@ -231,4 +219,4 @@ auto StreamWorker::IngestRawNetworkBytes(std::string_view incoming_bytes) noexce
     m_residual_buffer = std::string(processing_view);
 }
 
-} // namespace malama::network
+}  // namespace malama::network

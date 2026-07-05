@@ -11,8 +11,8 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include <string_view>
 #include <cstdint>
+#include <string_view>
 
 namespace malama::constants {
 
@@ -25,7 +25,7 @@ inline constexpr std::string_view default_ollama_endpoint = "http://localhost:11
 inline constexpr std::string_view default_ollama_host = "127.0.0.1";
 inline constexpr std::string_view default_ollama_port = "11434";
 inline constexpr std::string_view ollama_generate_path = "/api/generate";
-inline constexpr std::string_view ollama_chat_path = "/api/chat"; // Unified chat array route
+inline constexpr std::string_view ollama_chat_path = "/api/chat";  // Unified chat array route
 inline constexpr std::string_view fallback_model_name = "ornith:latest";
 
 // Memory & Processing Constraints
@@ -49,13 +49,13 @@ inline constexpr int default_sash_position = 300;
 inline constexpr int minimum_pane_size_pixels = 200;
 
 // Dark Maroon UI Hex Theme Palette Mappings
-inline constexpr std::string_view color_dark_maroon = "#2d0309";   // Primary panel background
-inline constexpr std::string_view color_maroon_surface = "#420912"; // Input boxes and text panels
-inline constexpr std::string_view color_maroon_element = "#5c101c"; // Buttons and controls
-inline constexpr std::string_view color_smoke_white = "#f5f5f7";    // Body text color
-inline constexpr std::string_view color_muted_rose = "#c4929a";     // Headers and status labels
-inline constexpr std::string_view color_code_background = "#1a0105"; // Codeblock view terminal
-inline constexpr std::string_view color_dark_brown = "#3E2723";     // sidebar color                                                                     // 
+inline constexpr std::string_view color_dark_maroon = "#2d0309";      // Primary panel background
+inline constexpr std::string_view color_maroon_surface = "#420912";   // Input boxes and text panels
+inline constexpr std::string_view color_maroon_element = "#5c101c";   // Buttons and controls
+inline constexpr std::string_view color_smoke_white = "#f5f5f7";      // Body text color
+inline constexpr std::string_view color_muted_rose = "#c4929a";       // Headers and status labels
+inline constexpr std::string_view color_code_background = "#1a0105";  // Codeblock view terminal
+inline constexpr std::string_view color_dark_brown = "#3E2723";       // sidebar color //
 
 // Button & Icon Styling Metrics
 inline constexpr int icon_button_margin = 4;
@@ -69,4 +69,4 @@ inline constexpr int NETWORK_READ_TIMEOUT_SEC = 60;
 // Typewriter Rendering Parameters
 inline constexpr int typewriter_delay_timer_ms = 5;
 
-} // namespace malama::constants
+}  // namespace malama::constants

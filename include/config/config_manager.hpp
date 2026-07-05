@@ -11,12 +11,12 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <functional>
+#include <glaze/glaze.hpp>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <functional>
-#include <mutex>
-#include <glaze/glaze.hpp>
 
 #include "common/constants.hpp"
 
@@ -26,7 +26,7 @@ struct EngineConfig final {
     std::string m_host{"127.0.0.1"};
     std::string m_port{"11434"};
     std::string m_active_model = "ornith:latest";
-    bool m_thinking_enabled{false}; // Dynamic toggle flag parameter
+    bool m_thinking_enabled{false};
 };
 
 struct AppearanceConfig final {
@@ -36,11 +36,17 @@ struct AppearanceConfig final {
     std::string m_text_primary{"#f5f5f7"};
     std::string m_text_accent{"#c4929a"};
     std::string m_code_bg{"#1a0105"};
-    std::string m_code_keyword{"#ff7b72"}; 
-    std::string m_code_string{"#a5d6ff"};  
-    std::string m_code_type{"#d2a8ff"};    
-    std::string m_code_comment{"#8b949e"}; 
+    std::string m_code_keyword{"#ff7b72"};
+    std::string m_code_string{"#a5d6ff"};
+    std::string m_code_type{"#d2a8ff"};
+    std::string m_code_comment{"#8b949e"};
     std::string m_code_line_num{"#666666"};
+
+    // FIXED: Added missing tracking variables for v0.2.6 milestones
+    std::string m_sidebar_bg{"#420912"};
+    std::string m_sidebar_text{"#f5f5f7"};
+    int m_font_size{11};
+    std::string m_font_family{"Sans"};
 };
 
 struct InteractionConfig final {
@@ -54,78 +60,64 @@ struct AppConfig final {
 };
 
 class ConfigManager final {
-public:
-    static auto get_instance() noexcept -> ConfigManager&;
+   public:
+    static auto get_instance() noexcept -> ConfigManager &;
 
     ~ConfigManager() = default;
 
-    ConfigManager(const ConfigManager&) = delete;
-    auto operator=(const ConfigManager&) -> ConfigManager& = delete;
-    ConfigManager(ConfigManager&&) noexcept = delete;
-    auto operator=(ConfigManager&&) noexcept -> ConfigManager& = delete;
+    ConfigManager(const ConfigManager &) = delete;
+    auto operator=(const ConfigManager &) -> ConfigManager & = delete;
+    ConfigManager(ConfigManager &&) noexcept = delete;
+    auto operator=(ConfigManager &&) noexcept -> ConfigManager & = delete;
 
-    auto load_config(const std::string& filepath = "malama_config.json") noexcept -> void;
-    auto save_config(const std::string& filepath = "malama_config.json") noexcept -> void;
-    
+    auto load_config(const std::string &filepath = "malama_config.json") noexcept -> void;
+    auto save_config(const std::string &filepath = "malama_config.json") noexcept -> void;
+
     [[nodiscard]] auto get_config() const noexcept -> AppConfig;
-    auto update_config(const AppConfig& new_config) noexcept -> void;
+    auto update_config(const AppConfig &new_config) noexcept -> void;
 
-    using observer_callback = std::function<void(const AppConfig&)>;
+    using observer_callback = std::function<void(const AppConfig &)>;
     auto register_observer(observer_callback callback) noexcept -> void;
 
-private:
+   private:
     ConfigManager() = default;
 
     AppConfig m_current_config;
     std::vector<observer_callback> m_observers;
-    mutable std::mutex m_mutex; 
+    mutable std::mutex m_mutex;
 };
 
-} // namespace malama::config
+}  // namespace malama::config
 
-template <>
+template<>
 struct glz::meta<malama::config::EngineConfig> {
     using T = malama::config::EngineConfig;
-    static constexpr auto value = object(
-        "host", &T::m_host,
-        "port", &T::m_port,
-        "active_model", &T::m_active_model,
-        "thinking_enabled", &T::m_thinking_enabled
-    );
+    static constexpr auto value =
+        object("host", &T::m_host, "port", &T::m_port, "active_model", &T::m_active_model,
+               "thinking_enabled", &T::m_thinking_enabled);
 };
 
-template <>
+template<>
 struct glz::meta<malama::config::AppearanceConfig> {
     using T = malama::config::AppearanceConfig;
     static constexpr auto value = object(
-        "theme_name", &T::m_theme_name,
-        "bg_color", &T::m_bg_color,
-        "surface_color", &T::m_surface_color,
-        "text_primary", &T::m_text_primary,
-        "text_accent", &T::m_text_accent,
-        "code_bg", &T::m_code_bg,
-        "code_keyword", &T::m_code_keyword,
-        "code_string", &T::m_code_string,
-        "code_type", &T::m_code_type,
-        "code_comment", &T::m_code_comment,
-        "code_line_num", &T::m_code_line_num
-    );
+        "theme_name", &T::m_theme_name, "bg_color", &T::m_bg_color, "surface_color",
+        &T::m_surface_color, "text_primary", &T::m_text_primary, "text_accent", &T::m_text_accent,
+        "code_bg", &T::m_code_bg, "code_keyword", &T::m_code_keyword, "code_string",
+        &T::m_code_string, "code_type", &T::m_code_type, "code_comment", &T::m_code_comment,
+        "code_line_num", &T::m_code_line_num, "sidebar_bg", &T::m_sidebar_bg, "sidebar_text",
+        &T::m_sidebar_text, "font_size", &T::m_font_size, "font_family", &T::m_font_family);
 };
 
-template <>
+template<>
 struct glz::meta<malama::config::InteractionConfig> {
     using T = malama::config::InteractionConfig;
-    static constexpr auto value = object(
-        "typewriter_delay_ms", &T::m_typewriter_delay_ms
-    );
+    static constexpr auto value = object("typewriter_delay_ms", &T::m_typewriter_delay_ms);
 };
 
-template <>
+template<>
 struct glz::meta<malama::config::AppConfig> {
     using T = malama::config::AppConfig;
-    static constexpr auto value = object(
-        "engine", &T::m_engine,
-        "appearance", &T::m_appearance,
-        "interaction", &T::m_interaction
-    );
+    static constexpr auto value = object("engine", &T::m_engine, "appearance", &T::m_appearance,
+                                         "interaction", &T::m_interaction);
 };

@@ -11,10 +11,10 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <string>
-#include <vector>
-#include <unordered_map>
 #include <boost/regex.hpp>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace malama::engine::markdown {
 
@@ -22,7 +22,7 @@ namespace malama::engine::markdown {
 struct SyntaxRule final {
     std::string m_pattern_string;
     boost::regex m_compiled_pattern;
-    std::string m_replacement_format; 
+    std::string m_replacement_format;
 };
 
 // Represents a complete grammar definition for a language
@@ -33,20 +33,19 @@ struct LanguageSyntax final {
 
 // The centralized grammar manager
 class SyntaxRegistry final {
-public:
-    SyntaxRegistry(); 
+   public:
+    SyntaxRegistry();
     ~SyntaxRegistry() = default;
-    
-    auto LoadFromJson(const std::string& filepath) -> bool; 
-    
-    [[nodiscard]] auto GetSyntaxFor(
-        const std::string& lang_id
-    ) const noexcept -> const LanguageSyntax*;
 
-private:
+    auto LoadFromJson(const std::string &filepath) -> bool;
+
+    [[nodiscard]] auto GetSyntaxFor(const std::string &lang_id) const noexcept
+        -> const LanguageSyntax *;
+
+   private:
     void RegisterBuiltinGrammars() noexcept;
 
     std::unordered_map<std::string, LanguageSyntax> m_language_map;
 };
 
-} // namespace malama::engine::markdown
+}  // namespace malama::engine::markdown

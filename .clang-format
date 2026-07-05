@@ -1,13 +1,58 @@
-# .clang-format — Magpiny C++23 style rules
-BasedOnStyle:                          Google
-IndentWidth:                           4
-ColumnLimit:                           100
-Standard:                              c++23
-BreakBeforeBraces:                     Attach
-PointerAlignment:                      Right
-SortIncludes:                          CaseInsensitive
-IncludeBlocks:                         Regroup
-AllowShortFunctionsOnASingleLine:      Inline
-AllowShortIfStatementsOnASingleLine:   Never
-SpaceAfterTemplateKeyword:             false
+# .clang-format — Magpiny C++23 style
+BasedOnStyle: Google
 
+# Basic formatting
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+
+# C++ standard
+Standard: Latest
+Cpp11BracedListStyle: true
+
+# Brace style
+BreakBeforeBraces: Attach
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: false
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  AfterExternBlock: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+
+# Pointers & References
+PointerAlignment: Right
+ReferenceAlignment: Right
+
+# Includes
+SortIncludes: CaseInsensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^<.*'
+    Priority: 1
+  - Regex: '^".*'
+    Priority: 2
+
+# Short statements/functions
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: All
+
+# Templates & others
+SpaceAfterTemplateKeyword: false
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# Other nice defaults
+BinPackArguments: true
+BinPackParameters: true
+SpacesInAngles: Never

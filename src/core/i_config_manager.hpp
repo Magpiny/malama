@@ -11,20 +11,21 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "common/types.hpp"
 #include <expected>
+
+#include "common/types.hpp"
 
 namespace malama::core {
 
 class IConfigManager {
-public:
+   public:
     virtual ~IConfigManager() = default;
 
-    [[nodiscard]] virtual auto LoadSettings() noexcept 
+    [[nodiscard]] virtual auto LoadSettings() noexcept
         -> std::expected<common::AppSettings, common::ConfigError> = 0;
 
-    [[nodiscard]] virtual auto SaveSettings(const common::AppSettings &settings) noexcept 
+    [[nodiscard]] virtual auto SaveSettings(const common::AppSettings &settings) noexcept
         -> std::expected<void, common::ConfigError> = 0;
 };
 
-} // namespace malama::core
+}  // namespace malama::core

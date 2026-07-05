@@ -11,7 +11,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <gtest/gtest.h>
-
 #include <wx/app.h>
 #include <wx/event.h>
 #include <wx/strconv.h>
@@ -23,20 +22,18 @@
 // Minimal wxWidgets environment initialiser required for wxString UTF-8 ops
 // ---------------------------------------------------------------------------
 class WxTestEnvironment : public ::testing::Environment {
-public:
+   public:
     void SetUp() override {
         m_argc = 1;
-        m_argv[0] = const_cast<char *>("malama_test"); // NOLINT
+        m_argv[0] = const_cast<char *>("malama_test");  // NOLINT
         m_argv[1] = nullptr;
-        wxApp::SetInstance(new wxApp()); // NOLINT(cppcoreguidelines-owning-memory)
+        wxApp::SetInstance(new wxApp());  // NOLINT(cppcoreguidelines-owning-memory)
         wxEntryStart(m_argc, m_argv);
     }
 
-    void TearDown() override {
-        wxEntryCleanup();
-    }
+    void TearDown() override { wxEntryCleanup(); }
 
-private:
+   private:
     int m_argc{0};
     char *m_argv[2]{};
 };
@@ -113,7 +110,7 @@ TEST(ThreadEventPayload, MultibyteUTF8TokenRoundTrip) {
     // the wxString::FromUTF8 -> ToStdString(wxConvUTF8) round-trip in
     // OnTokenReceived.
     wxThreadEvent evt(malama::ui::EVT_MALAMA_TOKEN);
-    const std::string original{"\xc3\xa9\xc3\xa0\xc3\xbc"}; // é à ü in UTF-8
+    const std::string original{"\xc3\xa9\xc3\xa0\xc3\xbc"};  // é à ü in UTF-8
     evt.SetString(wxString::FromUTF8(original.data(), original.size()));
     const std::string recovered = evt.GetString().ToStdString(wxConvUTF8);
     EXPECT_EQ(recovered, original);
@@ -146,7 +143,7 @@ TEST(ThreadEventPayload, NullptrGuardAllocationSucceedsUnderNormalConditions) {
     // confirming that the null-guard path is an exceptional branch only.
     auto *event_ptr = new (std::nothrow) wxThreadEvent(malama::ui::EVT_MALAMA_TOKEN);
     ASSERT_NE(event_ptr, nullptr);
-    delete event_ptr; // NOLINT(cppcoreguidelines-owning-memory)
+    delete event_ptr;  // NOLINT(cppcoreguidelines-owning-memory)
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +191,6 @@ TEST(OnTokenReceivedBehaviour, ThreeByteUTF8Sequence) {
 // ---------------------------------------------------------------------------
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
-    ::testing::AddGlobalTestEnvironment(new WxTestEnvironment()); // NOLINT
+    ::testing::AddGlobalTestEnvironment(new WxTestEnvironment());  // NOLINT
     return RUN_ALL_TESTS();
 }

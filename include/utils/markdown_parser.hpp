@@ -9,13 +9,11 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-
-
 #pragma once
 
+#include <sstream>
 #include <string>
 #include <string_view>
-#include <sstream>
 
 namespace malama::utils {
 
@@ -29,9 +27,8 @@ namespace malama::utils {
 
     while (!remaining.empty()) {
         std::size_t newline_pos = remaining.find('\n');
-        std::string_view line = (newline_pos == std::string_view::npos) 
-                                ? remaining 
-                                : remaining.substr(0, newline_pos);
+        std::string_view line =
+            (newline_pos == std::string_view::npos) ? remaining : remaining.substr(0, newline_pos);
 
         if (newline_pos == std::string_view::npos) {
             remaining = "";
@@ -45,7 +42,9 @@ namespace malama::utils {
                 html_output += "</code></pre></div>";
                 inside_code_block = false;
             } else {
-                html_output += "<div style=\"background-color:#1a0105; padding:8px; margin:4px; font-family:monospace;\"><pre><code>";
+                html_output +=
+                    "<div style=\"background-color:#1a0105; padding:8px; margin:4px; "
+                    "font-family:monospace;\"><pre><code>";
                 inside_code_block = true;
             }
             continue;
@@ -59,13 +58,18 @@ namespace malama::utils {
 
         // Handle Headers
         if (line.starts_with("### ")) {
-            html_output += "<h3><font color=\"#c4929a\">" + std::string(line.substr(4)) + "</font></h3>";
+            html_output +=
+                "<h3><font color=\"#c4929a\">" + std::string(line.substr(4)) + "</font></h3>";
             continue;
-        } if (line.starts_with("## ")) {
-            html_output += "<h2><font color=\"#c4929a\">" + std::string(line.substr(3)) + "</font></h2>";
+        }
+        if (line.starts_with("## ")) {
+            html_output +=
+                "<h2><font color=\"#c4929a\">" + std::string(line.substr(3)) + "</font></h2>";
             continue;
-        } if (line.starts_with("# ")) {
-            html_output += "<h1><font color=\"#c4929a\">" + std::string(line.substr(2)) + "</font></h1>";
+        }
+        if (line.starts_with("# ")) {
+            html_output +=
+                "<h1><font color=\"#c4929a\">" + std::string(line.substr(2)) + "</font></h1>";
             continue;
         }
 
@@ -77,33 +81,36 @@ namespace malama::utils {
             }
             html_output += "<li>" + std::string(line.substr(2)) + "</li>";
             continue;
-        } if (inside_list && line.empty()) {
+        }
+        if (inside_list && line.empty()) {
             html_output += "</ul>";
             inside_list = false;
         }
 
         // Inline formatting replacements (Bold & Inline Code)
         std::string processed_line = std::string(line);
-        
+
         // Basic Markdown bold tracking (**text**)
         std::size_t bold_start = 0;
         while ((bold_start = processed_line.find("**", bold_start)) != std::string::npos) {
             std::size_t bold_end = processed_line.find("**", bold_start + 2);
-            if (bold_end == std::string::npos) { break;
-}
-            
+            if (bold_end == std::string::npos) {
+                break;
+            }
+
             processed_line.replace(bold_end, 2, "</b>");
             processed_line.replace(bold_start, 2, "<b>");
-            bold_start = bold_end + 7; 
+            bold_start = bold_end + 7;
         }
 
         // Basic Inline Code tracking (`code`)
         std::size_t code_start = 0;
         while ((code_start = processed_line.find('`', code_start)) != std::string::npos) {
             std::size_t code_end = processed_line.find('`', code_start + 1);
-            if (code_end == std::string::npos) { break;
-}
-            
+            if (code_end == std::string::npos) {
+                break;
+            }
+
             processed_line.replace(code_end, 1, "</code>");
             processed_line.replace(code_start, 1, "<code style=\"background-color:#1a0105;\">");
             code_start = code_end + 39;
@@ -123,4 +130,4 @@ namespace malama::utils {
     return html_output;
 }
 
-} // namespace malama::utils
+}  // namespace malama::utils
