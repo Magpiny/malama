@@ -11,16 +11,17 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "common/types.hpp"
 #include <expected>
 #include <functional>
 #include <stop_token>
 #include <string_view>
 
+#include "common/types.hpp"
+
 namespace malama::network {
 
 class IOllamaClient {
-public:
+   public:
     // Fixed: Explicitly declare default constructor to restore generation chains
     IOllamaClient() = default;
     virtual ~IOllamaClient() = default;
@@ -34,11 +35,10 @@ public:
     IOllamaClient &operator=(IOllamaClient &&) noexcept = default;
 
     [[nodiscard]] virtual auto RequestStream(
-        std::string_view model_name,
-        const std::vector<common::Message> &historical_chain,
+        std::string_view model_name, const std::vector<common::Message> &historical_chain,
         std::move_only_function<void(std::string_view)> token_callback,
-        std::stop_token cancellation_token
-    ) noexcept -> std::expected<void, common::NetworkError> = 0;
+        std::stop_token cancellation_token) noexcept
+        -> std::expected<void, common::NetworkError> = 0;
 };
 
-} // namespace malama::network
+}  // namespace malama::network

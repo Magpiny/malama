@@ -11,55 +11,57 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "core/models.hpp"
 #include <filesystem>
-#include <optional>
-#include <vector>
-#include <string>
 #include <mutex>
+#include <optional>
+#include <string>
+#include <vector>
 
-struct sqlite3; // Opaque forward pointer configuration to block internal leaks
+#include "core/models.hpp"
+
+struct sqlite3;  // Opaque forward pointer configuration to block internal leaks
 
 namespace malama::engine::storage {
 
 class HistoryManager final {
-public:
+   public:
     // Initializes directory frames and provisions the synchronized SQLite database
     explicit HistoryManager(std::filesystem::path storage_dir);
     ~HistoryManager();
 
     // Enforce definitive operational boundaries for underlying handle resources
-    HistoryManager(const HistoryManager&) = delete;
-    auto operator=(const HistoryManager&) -> HistoryManager& = delete;
-    HistoryManager(HistoryManager&&) noexcept = delete;
-    auto operator=(HistoryManager&&) noexcept -> HistoryManager& = delete;
+    HistoryManager(const HistoryManager &) = delete;
+    auto operator=(const HistoryManager &) -> HistoryManager & = delete;
+    HistoryManager(HistoryManager &&) noexcept = delete;
+    auto operator=(HistoryManager &&) noexcept -> HistoryManager & = delete;
 
     // Lifecycle Management
-    [[nodiscard]] auto CreateSession(const std::string& initial_title) -> core::SessionMetadata;
-    auto DeleteSession(const std::string& session_id) -> void;
+    [[nodiscard]] auto CreateSession(const std::string &initial_title) -> core::SessionMetadata;
+    auto DeleteSession(const std::string &session_id) -> void;
 
     // Transactional Serialized Database Mutations
-    auto AppendMessage(const std::string& session_id, const core::Message& message) -> void;
-    auto UpdateSessionTitle(const std::string& session_id, const std::string& new_title) -> void;
-    auto ToggleSessionPin(const std::string& session_id) -> void;
-    auto ToggleMessageStar(const std::string& session_id, const std::string& message_id) -> void;
+    auto AppendMessage(const std::string &session_id, const core::Message &message) -> void;
+    auto UpdateSessionTitle(const std::string &session_id, const std::string &new_title) -> void;
+    auto ToggleSessionPin(const std::string &session_id) -> void;
+    auto ToggleMessageStar(const std::string &session_id, const std::string &message_id) -> void;
 
     // Data Retrieval Pipelines
     [[nodiscard]] auto LoadAllMetadata() const -> std::vector<core::SessionMetadata>;
-    [[nodiscard]] auto LoadSession(const std::string& session_id) const -> std::optional<core::ChatSession>;
+    [[nodiscard]] auto LoadSession(const std::string &session_id) const
+        -> std::optional<core::ChatSession>;
 
     [[nodiscard]] static auto GenerateUuidString() -> std::string;
     [[nodiscard]] static auto GetCurrentEpoch() -> uint64_t;
 
-private:
+   private:
     auto InitializeDatabase() noexcept -> bool;
 
     std::filesystem::path m_storage_dir;
     std::filesystem::path m_db_path;
-    sqlite3* m_db_handle{nullptr};
-    
+    sqlite3 *m_db_handle{nullptr};
+
     // Mutex lock to synchronize UI inputs and async streaming background workers
     mutable std::mutex m_mutex;
 };
 
-} // namespace malama::engine::storage
+}  // namespace malama::engine::storage

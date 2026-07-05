@@ -11,20 +11,20 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "common/constants.hpp"
-
-#include <string>
-#include <string_view>
-#include <functional>
 #include <array>
-#include <thread>
 #include <atomic>
 #include <boost/asio.hpp>
+#include <functional>
+#include <string>
+#include <string_view>
+#include <thread>
+
+#include "common/constants.hpp"
 
 namespace malama::network {
 
 class OllamaClient final {
-public:
+   public:
     explicit OllamaClient(std::string host, std::string port) noexcept;
     ~OllamaClient() noexcept;
 
@@ -33,9 +33,10 @@ public:
     OllamaClient(OllamaClient &&) noexcept = delete;
     OllamaClient &operator=(OllamaClient &&) noexcept = delete;
 
-    auto SubmitPrompt(std::string_view prompt_text, std::string_view model_name, std::function<void(std::string_view)> on_data) noexcept -> void;
+    auto SubmitPrompt(std::string_view prompt_text, std::string_view model_name,
+                      std::function<void(std::string_view)> on_data) noexcept -> void;
 
-private:
+   private:
     auto DoResolve() noexcept -> void;
     auto DoConnect(const boost::asio::ip::tcp::resolver::results_type &endpoints) noexcept -> void;
     auto DoWrite() noexcept -> void;
@@ -55,4 +56,4 @@ private:
     std::atomic<bool> m_operation_in_progress{false};
 };
 
-} // namespace malama::network
+}  // namespace malama::network

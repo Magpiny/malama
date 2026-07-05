@@ -16,7 +16,7 @@
 namespace malama::core {
 
 class ConfigManager final : public IConfigManager {
-public:
+   public:
     explicit ConfigManager(std::string config_path) noexcept;
     ~ConfigManager() override = default;
 
@@ -25,15 +25,15 @@ public:
     ConfigManager(ConfigManager &&) noexcept = default;
     ConfigManager &operator=(ConfigManager &&) noexcept = default;
 
-    [[nodiscard]] auto LoadSettings() noexcept 
+    [[nodiscard]] auto LoadSettings() noexcept
         -> std::expected<common::AppSettings, common::ConfigError> override;
 
-    [[nodiscard]] auto SaveSettings(const common::AppSettings &settings) noexcept 
+    [[nodiscard]] auto SaveSettings(const common::AppSettings &settings) noexcept
         -> std::expected<void, common::ConfigError> override;
 
-private:
+   private:
     std::string m_target_filepath;
     common::AppSettings m_cached_state;
 };
 
-} // namespace malama::core
+}  // namespace malama::core

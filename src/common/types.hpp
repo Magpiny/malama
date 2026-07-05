@@ -11,19 +11,16 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "common/constants.hpp"
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "common/constants.hpp"
+
 namespace malama::common {
 
 // Optimized: Explicitly pinned to 1 byte to minimize structure allocation overheads
-enum class AuthorRole : std::uint8_t {
-    System,
-    User,
-    Assistant
-};
+enum class AuthorRole : std::uint8_t { System, User, Assistant };
 
 // Optimized: Explicitly pinned to 1 byte for non-throwing return paths
 enum class ConfigError : std::uint8_t {
@@ -65,4 +62,4 @@ struct AppSettings {
     bool m_stream_tokens{true};
 };
 
-} // namespace malama::common
+}  // namespace malama::common

@@ -7,13 +7,15 @@
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <wx/wx.h>
 #include <new>
+#include <spdlog/spdlog.h>
 #include <string>
 #include <vector>
-#include <spdlog/spdlog.h>
+#include <wx/image.h>
+#include <wx/wx.h>
+
 #include "common/constants.hpp"
 #include "config/config_manager.hpp"
 #include "network/ollama_client.hpp"
@@ -23,7 +25,7 @@
 namespace malama {
 
 class MalamaApp final : public wxApp {
-public:
+   public:
     explicit MalamaApp() = default;
     ~MalamaApp() override = default;
 
@@ -33,19 +35,17 @@ public:
     auto operator=(MalamaApp &&) noexcept -> MalamaApp & = delete;
 
     [[nodiscard]] bool OnInit() override {
+        wxInitAllImageHandlers();
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.2.5 Production Persistence Engine...\n");
+        spdlog::info("Initializing malama v0.2.6 UI Customizations...\n");
 
-        // Bootstrap configuration state settings right at application boot time
         config::ConfigManager::get_instance().load_config("malama_config.json");
         const auto app_config = config::ConfigManager::get_instance().get_config();
 
         Bind(ui::EVT_MALAMA_TOKEN, &MalamaApp::OnTokenReceived, this);
 
-        auto *raw_client_ptr = new (std::nothrow) network::OllamaClient(
-            app_config.m_engine.m_host,
-            app_config.m_engine.m_port
-        );
+        auto *raw_client_ptr = new (std::nothrow)
+            network::OllamaClient(app_config.m_engine.m_host, app_config.m_engine.m_port);
         if (raw_client_ptr == nullptr) {
             return false;
         }
@@ -58,51 +58,57 @@ public:
         m_worker_ptr.reset(raw_worker_ptr);
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(
-            "malama Local UI Engine",
-            wxDefaultPosition,
+            "Malama", wxDefaultPosition,
             wxSize(constants::default_window_width, constants::default_window_height),
-            [this](const std::string& user_prompt) mutable {
-                auto *current_frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
+            [this](const std::string &user_prompt) mutable {
+                auto *current_frame_ptr = dynamic_cast<ui::MainFrame *>(GetTopWindow());
                 if (current_frame_ptr != nullptr) {
                     current_frame_ptr->AppendUserMessage(user_prompt);
                 }
 
                 if (m_worker_ptr != nullptr) {
-                    const auto current_config = 
-                        config::ConfigManager::get_instance().get_config();
-                    
+                    const auto current_config = config::ConfigManager::get_instance().get_config();
+
                     m_worker_ptr->InitializeGeneration(
-                        current_config.m_engine.m_active_model,
-                        user_prompt,
+                        current_config.m_engine.m_active_model, user_prompt,
                         std::vector<core::Message>{},
                         [](std::string_view parsed_token, bool is_final) mutable {
-                            auto *event_ptr = new (std::nothrow) wxThreadEvent(
-                                ui::EVT_MALAMA_TOKEN
-                            );
+                            auto *event_ptr =
+                                new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN);
                             if (event_ptr != nullptr) {
-                                event_ptr->SetString(wxString::FromUTF8(
-                                    parsed_token.data(), parsed_token.size()
-                                ));
+                                event_ptr->SetString(
+                                    wxString::FromUTF8(parsed_token.data(), parsed_token.size()));
                                 event_ptr->SetInt(is_final ? 1 : 0);
                                 wxQueueEvent(wxTheApp, event_ptr);
                             }
-                        }
-                    );
+                        });
                 }
-            }
-        );
+            });
 
         if (frame_ptr == nullptr) {
             return false;
+        }
+
+        // FIXED: Replicated the working snippet's exact logic pattern for Wayland compatibility
+        wxString icon_path = "./assets/ic_malama.jpeg";
+        if (wxFileExists(icon_path)) {
+            wxIcon app_icon;
+            if (app_icon.LoadFile(icon_path, wxBITMAP_TYPE_JPEG)) {
+                frame_ptr->SetIcon(app_icon);
+            } else {
+                spdlog::warn("Failed to load icon from file in: {}", icon_path.ToStdString());
+            }
+        } else {
+            spdlog::warn("Icon file not found in: {}", icon_path.ToStdString());
         }
 
         frame_ptr->Show(true);
         return true;
     }
 
-private:
-    void OnTokenReceived(wxThreadEvent& event) {
-        auto* frame_ptr = dynamic_cast<ui::MainFrame*>(GetTopWindow());
+   private:
+    void OnTokenReceived(wxThreadEvent &event) {
+        auto *frame_ptr = dynamic_cast<ui::MainFrame *>(GetTopWindow());
         if (frame_ptr != nullptr) {
             bool is_final = event.GetInt() == 1;
             if (is_final) {
@@ -116,6 +122,6 @@ private:
     std::unique_ptr<network::StreamWorker> m_worker_ptr;
 };
 
-} // namespace malama
+}  // namespace malama
 
 wxIMPLEMENT_APP(malama::MalamaApp);

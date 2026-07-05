@@ -10,41 +10,41 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "engine/markdown/pipeline.hpp"
+
 #include <algorithm>
+#include <array>
 #include <boost/regex.hpp>
 #include <boost/spirit/home/x3.hpp>
 #include <ranges>
 #include <string>
-#include <vector>
 #include <utility>
-#include <array>
+#include <vector>
 
 namespace malama::engine::markdown {
 
 namespace x3 = boost::spirit::x3;
 
 namespace local_constants {
-    constexpr size_t hex_buffer_reserve_scale = 2;
-    constexpr size_t hex_bits_shift_value = 4;
-    constexpr char hex_mask_lower_nibble = 0x0F;
-    constexpr size_t step_past_delimiter = 1;
-    constexpr size_t structural_zero_index = 0;
-    constexpr size_t minimum_valid_table_rows = 2;
+constexpr size_t hex_buffer_reserve_scale = 2;
+constexpr size_t hex_bits_shift_value = 4;
+constexpr char hex_mask_lower_nibble = 0x0F;
+constexpr size_t step_past_delimiter = 1;
+constexpr size_t structural_zero_index = 0;
+constexpr size_t minimum_valid_table_rows = 2;
 
-    constexpr std::string_view break_line_marker = "<br>";
-    constexpr std::string_view spaces_accumulation = " ";
-    constexpr std::string_view horizontal_rule_tag = "<hr>";
-    constexpr std::string_view paragraph_start_tag = "<p>";
-    constexpr std::string_view paragraph_close_tag = "</p>";
-    constexpr std::string_view unordered_list_tag = "ul";
-    constexpr std::string_view ordered_list_tag = "ol";
-    constexpr std::string_view header_1_size = "+2";
-    constexpr std::string_view header_2_size = "+1";
-    constexpr std::string_view header_3_size;
-} // namespace local_constants
+constexpr std::string_view break_line_marker = "<br>";
+constexpr std::string_view spaces_accumulation = " ";
+constexpr std::string_view horizontal_rule_tag = "<hr>";
+constexpr std::string_view paragraph_start_tag = "<p>";
+constexpr std::string_view paragraph_close_tag = "</p>";
+constexpr std::string_view unordered_list_tag = "ul";
+constexpr std::string_view ordered_list_tag = "ol";
+constexpr std::string_view header_1_size = "+2";
+constexpr std::string_view header_2_size = "+1";
+constexpr std::string_view header_3_size;
+}  // namespace local_constants
 
-Pipeline::Pipeline(config::AppearanceConfig theme) noexcept 
-    : m_theme(std::move(theme)) {}
+Pipeline::Pipeline(config::AppearanceConfig theme) noexcept : m_theme(std::move(theme)) {}
 
 auto Pipeline::process(std::string_view raw_markdown) const -> std::string {
     auto tokens = tokenize(raw_markdown);
@@ -53,29 +53,6 @@ auto Pipeline::process(std::string_view raw_markdown) const -> std::string {
 
 struct TokenizerState {
     std::vector<Token> m_tokens;
-
-    std::string m_current_buffer;
-    std::string m_code_lang;
-    bool m_in_code_block{false};
-
-    /**
-     * @brief Emits the buffered token, if any, and clears the buffer state.
-     *
-     * Creates a token from the current buffer content, assigns the given type,
-     * stores the captured language, and appends it to the token list.
-     *
-     * @param type Token type to assign to the buffered content.
-     */
-    void push_buffer_as(token_type type) {
-        if (!m_current_buffer.empty()) {
-            Token tok;
-            tok.m_type = type;
-            tok.m_content = m_current_buffer;
-            tok.m_language = m_code_lang;
-            m_tokens.push_back(tok);
-            m_current_buffer.clear();
-            m_code_lang.clear();
-
     std::string m_buffer;
     std::string m_language;
     bool m_in_block{false};
@@ -89,15 +66,11 @@ struct TokenizerState {
             m_tokens.push_back(token);
             m_buffer.clear();
             m_language.clear();
-
         }
     }
 };
 
-static void parse_markdown_elements(
-    std::string_view line_view,
-    TokenizerState& state
-) {
+static void parse_markdown_elements(std::string_view line_view, TokenizerState &state) {
     auto head_3_tag = x3::lit("### ");
     auto head_2_tag = x3::lit("## ");
     auto head_1_tag = x3::lit("# ");
@@ -141,16 +114,13 @@ static void parse_markdown_elements(
         } else if (line_view.empty()) {
             state.m_buffer += local_constants::break_line_marker;
         } else {
-            state.m_buffer += std::string(line_view) + 
-                             std::string(local_constants::spaces_accumulation);
+            state.m_buffer +=
+                std::string(line_view) + std::string(local_constants::spaces_accumulation);
         }
     }
 }
 
-static void evaluate_line_tokens(
-    std::string_view line_view, 
-    TokenizerState& state
-) {
+static void evaluate_line_tokens(std::string_view line_view, TokenizerState &state) {
     auto block_tag = x3::lit("```");
     const auto *line_start = line_view.cbegin();
     const auto *line_final = line_view.cend();
@@ -175,34 +145,20 @@ static void evaluate_line_tokens(
     parse_markdown_elements(line_view, state);
 }
 
-
-/**
- * @brief Tokenizes markdown text into a sequence of block tokens.
- *
- * Splits the input into lines, applies markdown line classification, and preserves
- * paragraph and code-block content across line boundaries.
- *
- * @param text Markdown source to tokenize.
- * @return std::vector<Token> The generated token sequence.
- */
-auto Pipeline::tokenize(std::string_view text) -> std::vector<Token> {
-    TokenizeState state;
-    std::string_view remaining = text;
-  
-auto Pipeline::tokenize(std::string_view text) const -> std::vector<Token> {
+auto Pipeline::tokenize(std::string_view text_content) -> std::vector<Token> {
     TokenizerState state;
     size_t current_position = local_constants::structural_zero_index;
     const size_t total_length = text_content.size();
 
     while (current_position < total_length) {
         const size_t newline_position = text_content.find('\n', current_position);
-        
+
         const size_t segment_length = (newline_position == std::string_view::npos)
-            ? total_length - current_position
-            : newline_position - current_position;
+                                          ? total_length - current_position
+                                          : newline_position - current_position;
 
         std::string_view line_view = text_content.substr(current_position, segment_length);
-        
+
         if (!line_view.empty() && line_view.back() == '\r') {
             line_view.remove_suffix(local_constants::step_past_delimiter);
         }
@@ -212,7 +168,7 @@ auto Pipeline::tokenize(std::string_view text) const -> std::vector<Token> {
         if (newline_position == std::string_view::npos) {
             break;
         }
-        
+
         current_position = newline_position + local_constants::step_past_delimiter;
     }
 
@@ -226,24 +182,15 @@ auto Pipeline::decorate_inline_text(std::string_view text_content) const -> std:
 
     std::string processed{text_content};
     processed = boost::regex_replace(processed, bold_pattern, "<b>$1</b>");
-    
-    std::string inline_code_tag = "<font color=\"" + m_theme.m_code_string + 
-                                  R"(" face="monospace">$1</font>)";
+
+    std::string inline_code_tag =
+        "<font color=\"" + m_theme.m_code_string + R"(" face="monospace">$1</font>)";
     processed = boost::regex_replace(processed, code_pattern, inline_code_tag);
     return processed;
 }
 
-/**
- * @brief Renders a syntax-highlighted code block as HTML.
- *
- * @param code Source code to render.
- * @param lang Language identifier used to select syntax rules.
- * @return std::string HTML for the formatted code block, including copy and download actions.
- */
-auto Pipeline::decorate_code_block(
-    std::string_view code, 
-    const std::string& lang
-) const -> std::string {
+auto Pipeline::decorate_code_block(std::string_view code, const std::string &lang) const
+    -> std::string {
     static const boost::regex entity_amp("&");
     static const boost::regex entity_lt("<");
     static const boost::regex entity_gt(">");
@@ -272,7 +219,7 @@ auto Pipeline::decorate_code_block(
     processed = boost::regex_replace(processed, entity_lt, "&lt;");
     processed = boost::regex_replace(processed, entity_gt, "&gt;");
 
-    const auto* syntax = m_registry.GetSyntaxFor(lang);
+    const auto *syntax = m_registry.GetSyntaxFor(lang);
     if (syntax != nullptr) {
         std::string result_string;
         size_t current_pos = 0;
@@ -285,15 +232,15 @@ auto Pipeline::decorate_code_block(
 
             for (size_t rule_idx = 0; rule_idx < syntax->m_rules.size(); ++rule_idx) {
                 boost::smatch match_results;
-                
+
                 // Fixes Issue 5: Uses explicit static cast to avoid narrowing conversion warnings
                 auto start_offset = static_cast<std::ptrdiff_t>(current_pos);
                 auto start_iter = std::next(processed.cbegin(), start_offset);
                 auto final_iter = processed.cend();
-                
-                const auto& rule_ref = syntax->m_rules[rule_idx];
-                if (boost::regex_search(start_iter, final_iter, match_results, 
-                    rule_ref.m_compiled_pattern)) {
+
+                const auto &rule_ref = syntax->m_rules[rule_idx];
+                if (boost::regex_search(start_iter, final_iter, match_results,
+                                        rule_ref.m_compiled_pattern)) {
                     size_t match_start = current_pos + match_results.position();
                     size_t match_final = match_start + match_results.length();
                     if (match_start < best_start) {
@@ -312,7 +259,7 @@ auto Pipeline::decorate_code_block(
             }
 
             result_string += processed.substr(current_pos, best_start - current_pos);
-            const auto& rule_ref = syntax->m_rules[best_rule_idx];
+            const auto &rule_ref = syntax->m_rules[best_rule_idx];
             result_string += best_match.format(rule_ref.m_replacement_format);
             current_pos = (best_final == current_pos) ? current_pos + 1 : best_final;
         }
@@ -335,28 +282,29 @@ auto Pipeline::decorate_code_block(
     processed = boost::regex_replace(processed, marker_05, keyword_color_tag);
     processed = boost::regex_replace(processed, marker_06, "</font>");
 
-    processed = boost::regex_replace(processed, marker_07, "<font color=\"#E5C07B\">"); 
+    processed = boost::regex_replace(processed, marker_07, "<font color=\"#E5C07B\">");
     processed = boost::regex_replace(processed, marker_08, "</font>");
-    processed = boost::regex_replace(processed, marker_0F, "<font color=\"#D19A66\">"); 
+    processed = boost::regex_replace(processed, marker_0F, "<font color=\"#D19A66\">");
     processed = boost::regex_replace(processed, marker_10, "</font>");
-    processed = boost::regex_replace(processed, marker_11, "<font color=\"#98C379\">"); 
+    processed = boost::regex_replace(processed, marker_11, "<font color=\"#98C379\">");
     processed = boost::regex_replace(processed, marker_12, "</font>");
-    processed = boost::regex_replace(processed, marker_13, "<font color=\"#43A047\">"); 
+    processed = boost::regex_replace(processed, marker_13, "<font color=\"#43A047\">");
     processed = boost::regex_replace(processed, marker_14, "</font>");
 
     std::string hex_encoded_string;
     hex_encoded_string.reserve(code.size() * local_constants::hex_buffer_reserve_scale);
 
-    static const std::array<char, 16> hex_digits{
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'
-    };
+    static const std::array<char, 16> hex_digits{'0', '1', '2', '3', '4', '5', '6', '7',
+                                                 '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
     for (char xchar : code) {
         const auto token_byte = static_cast<std::uint8_t>(xchar);
-        hex_encoded_string.push_back(hex_digits.at(token_byte >> local_constants::hex_bits_shift_value));
-        hex_encoded_string.push_back(hex_digits.at(token_byte & local_constants::hex_mask_lower_nibble));
+        hex_encoded_string.push_back(
+            hex_digits.at(token_byte >> local_constants::hex_bits_shift_value));
+        hex_encoded_string.push_back(
+            hex_digits.at(token_byte & local_constants::hex_mask_lower_nibble));
     }
-    
+
     std::string actions_html = R"(<div align="right">)";
     actions_html += R"(<a href="malama://copy_code:)";
     actions_html += hex_encoded_string;
@@ -376,26 +324,20 @@ auto Pipeline::decorate_code_block(
     return html_output;
 }
 
-void Pipeline::handle_header(
-    const Token& token_ref, 
-    std::string& html_output, 
-    std::string_view size_modifier
-) const {
+void Pipeline::handle_header(const Token &token_ref, std::string &html_output,
+                             std::string_view size_modifier) const {
     html_output += R"(<br><b><font )";
     if (!size_modifier.empty()) {
         html_output += "size=\"" + std::string(size_modifier) + "\" ";
     }
-    html_output += "color=\"" + m_theme.m_text_accent + "\">" + decorate_inline_text(token_ref.m_content);
+    html_output +=
+        "color=\"" + m_theme.m_text_accent + "\">" + decorate_inline_text(token_ref.m_content);
     html_output += "</font></b><br><br>";
 }
 
-void Pipeline::handle_list(
-    const Token& token_ref, 
-    std::string& html_output, 
-    ListStatePair flags, 
-    std::string_view list_tag
-) const {
-    
+void Pipeline::handle_list(const Token &token_ref, std::string &html_output, ListStatePair flags,
+                           std::string_view list_tag) const {
+    // .get() returns the underlying raw bool reference seamlessly
     if (flags.m_is_alternative.get()) {
         html_output += (list_tag == local_constants::unordered_list_tag) ? "</ol><br>" : "</ul>";
         flags.m_is_alternative.get() = false;
@@ -407,25 +349,22 @@ void Pipeline::handle_list(
     html_output += "<li>" + decorate_inline_text(token_ref.m_content) + "</li>";
 }
 
-void Pipeline::handle_paragraph(const Token& token_ref, std::string& html_output) const {
+void Pipeline::handle_paragraph(const Token &token_ref, std::string &html_output) const {
     if (!token_ref.m_content.empty()) {
-        html_output += std::string(local_constants::paragraph_start_tag) + 
-                       decorate_inline_text(token_ref.m_content) + 
+        html_output += std::string(local_constants::paragraph_start_tag) +
+                       decorate_inline_text(token_ref.m_content) +
                        std::string(local_constants::paragraph_close_tag);
     }
 }
 
-void Pipeline::handle_code_block(const Token& token_ref, std::string& html_output) const {
+void Pipeline::handle_code_block(const Token &token_ref, std::string &html_output) const {
     html_output += decorate_code_block(token_ref.m_content, token_ref.m_language);
 }
 
-void Pipeline::handle_divider(std::string& html_output) {
+// Fixes Issue 2: Static handler method implementation
+void Pipeline::handle_divider(std::string &html_output) {
     html_output += local_constants::horizontal_rule_tag;
 }
-
-// -----------------------------------------------------------------------------
-// Structural Table Utilities (Fixes Issue 1: Compresses Cognitive Complexity to 3)
-// -----------------------------------------------------------------------------
 
 static auto parse_row_cells(std::string_view row_text) -> std::vector<std::string> {
     std::vector<std::string> parsed_cells;
@@ -445,51 +384,42 @@ static auto parse_row_cells(std::string_view row_text) -> std::vector<std::strin
     return parsed_cells;
 }
 
-void emit_rendered_cells(
-    std::string& html_output,
-    const std::vector<std::string>& cells,
-    size_t row_idx,
-    const config::AppearanceConfig& theme,
-    const std::function<std::string(std::string_view)>& decorator
-) {
+void emit_rendered_cells(std::string &html_output, const std::vector<std::string> &cells,
+                         size_t row_idx, const config::AppearanceConfig &theme,
+                         const std::function<std::string(std::string_view)> &decorator) {
     auto is_space = [](unsigned char character) { return std::isspace(character); };
 
-    for (const auto& cell_content : cells) {
+    for (const auto &cell_content : cells) {
         std::string trimmed = cell_content;
         trimmed.erase(trimmed.begin(), std::ranges::find_if_not(trimmed, is_space));
-        trimmed.erase(std::ranges::find_if_not(std::views::reverse(trimmed), is_space).base(), 
+        trimmed.erase(std::ranges::find_if_not(std::views::reverse(trimmed), is_space).base(),
                       trimmed.end());
 
         if (row_idx == 0) {
-            html_output += R"(<th bgcolor=" )" + theme.m_surface_color + 
-                           R"( "><b><font color=" )" + theme.m_text_accent + 
-                           R"( ">)" + decorator(trimmed) + R"(</font></b></th>)";
+            html_output += R"(<th bgcolor=" )" + theme.m_surface_color + R"( "><b><font color=" )" +
+                           theme.m_text_accent + R"( ">)" + decorator(trimmed) +
+                           R"(</font></b></th>)";
         } else {
-            html_output += R"(<td><font color=" )" + theme.m_text_primary + 
-                           R"( ">)" + decorator(trimmed) + R"(</font></td>)";
+            html_output += R"(<td><font color=" )" + theme.m_text_primary + R"( ">)" +
+                           decorator(trimmed) + R"(</font></td>)";
         }
     }
 }
 
-auto Pipeline::scan_and_emit_table(
-    const std::vector<Token>& tokens, 
-    size_t& current_idx, 
-    std::string& html_output
-) const -> bool {
-    const auto& token_ref = tokens[current_idx];
-    if (token_ref.m_type != token_type::paragraph || 
-        token_ref.m_content.empty() || 
+auto Pipeline::scan_and_emit_table(const std::vector<Token> &tokens, size_t &current_idx,
+                                   std::string &html_output) const -> bool {
+    const auto &token_ref = tokens[current_idx];
+    if (token_ref.m_type != token_type::paragraph || token_ref.m_content.empty() ||
         token_ref.m_content.front() != '|') {
         return false;
     }
 
     std::vector<std::string_view> table_rows;
     size_t lookahead_idx = current_idx;
-    
+
     while (lookahead_idx < tokens.size()) {
-        const auto& future_token = tokens[lookahead_idx];
-        if (future_token.m_type == token_type::paragraph && 
-            !future_token.m_content.empty() && 
+        const auto &future_token = tokens[lookahead_idx];
+        if (future_token.m_type == token_type::paragraph && !future_token.m_content.empty() &&
             future_token.m_content.front() == '|') {
             table_rows.push_back(future_token.m_content);
             ++lookahead_idx;
@@ -503,14 +433,16 @@ auto Pipeline::scan_and_emit_table(
     }
 
     html_output += R"(<br><table width="100%" border="1" cellspacing="0" cellpadding="6" )";
-    html_output += R"(style="border-collapse:collapse; background-color:)" + m_theme.m_code_bg + R"(;">)";
+    html_output +=
+        R"(style="border-collapse:collapse; background-color:)" + m_theme.m_code_bg + R"(;">)";
 
     auto decorator_wrapper = [this](std::string_view text) { return decorate_inline_text(text); };
 
     for (size_t row_idx = 0; row_idx < table_rows.size(); ++row_idx) {
         auto row_text = table_rows[row_idx];
         bool is_separator = std::ranges::all_of(row_text, [](char symbol) {
-            return symbol == '|' || symbol == '-' || symbol == ':' || symbol == ' ' || symbol == '\t';
+            return symbol == '|' || symbol == '-' || symbol == ':' || symbol == ' ' ||
+                   symbol == '\t';
         });
 
         if (is_separator) {
@@ -528,16 +460,8 @@ auto Pipeline::scan_and_emit_table(
     return true;
 }
 
-
-/**
- * @brief Renders markdown tokens as HTML.
- *
- * @param tokens Token stream produced by the markdown tokenizer.
- * @return std::string Rendered HTML.
- */
-
 // -----------------------------------------------------------------------------
-auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
+auto Pipeline::emit(const std::vector<Token> &tokens) const -> std::string {
     std::string html_output;
     bool in_unordered_list = false;
     bool in_ordered_list = false;
@@ -560,9 +484,9 @@ auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
             continue;
         }
 
-        const auto& token_ref = tokens[token_idx];
-        
-        if (token_ref.m_type != token_type::list_unordered && 
+        const auto &token_ref = tokens[token_idx];
+
+        if (token_ref.m_type != token_type::list_unordered &&
             token_ref.m_type != token_type::list_ordered) {
             close_active_lists();
         }
@@ -581,13 +505,15 @@ auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
                 break;
             case token_type::list_unordered:
                 // std::ref explicitly binds the local variable state safely to the wrapper
-                handle_list(token_ref, html_output, 
-                            ListStatePair{.m_is_active=std::ref(in_unordered_list), .m_is_alternative=std::ref(in_ordered_list)}, 
+                handle_list(token_ref, html_output,
+                            ListStatePair{.m_is_active = std::ref(in_unordered_list),
+                                          .m_is_alternative = std::ref(in_ordered_list)},
                             local_constants::unordered_list_tag);
                 break;
             case token_type::list_ordered:
-                handle_list(token_ref, html_output, 
-                            ListStatePair{.m_is_active=std::ref(in_ordered_list), .m_is_alternative=std::ref(in_unordered_list)}, 
+                handle_list(token_ref, html_output,
+                            ListStatePair{.m_is_active = std::ref(in_ordered_list),
+                                          .m_is_alternative = std::ref(in_unordered_list)},
                             local_constants::ordered_list_tag);
                 break;
             case token_type::code_block:
@@ -605,4 +531,4 @@ auto Pipeline::emit(const std::vector<Token>& tokens) const -> std::string {
     return html_output;
 }
 
-} // namespace malama::engine::markdown
+}  // namespace malama::engine::markdown

@@ -9,13 +9,14 @@
 
 #pragma once
 
+#include <cstdint>
 #include <string>
 
 // SPDX-License-Identifier: Apache-2.0
 
 namespace malama::engine::markdown {
 
-enum class token_type {
+enum class token_type : std::uint8_t {
     paragraph,
     header_1,
     header_2,
@@ -28,8 +29,8 @@ enum class token_type {
 
 struct Token final {
     token_type m_type{token_type::paragraph};
-    std::string m_content{};
-    std::string m_language{};
+    std::string m_content;
+    std::string m_language;
 };
 
-} // namespace malama::engine::markdown
+}  // namespace malama::engine::markdown

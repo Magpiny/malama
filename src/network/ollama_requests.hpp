@@ -11,8 +11,8 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include <string>
 #include <glaze/glaze.hpp>
+#include <string>
 
 namespace malama::network {
 
@@ -23,12 +23,9 @@ struct OllamaGenerateRequest final {
 
     struct glaze {
         using T = OllamaGenerateRequest;
-        static constexpr auto value = glz::object(
-            "model", &T::model,
-            "prompt", &T::prompt,
-            "stream", &T::stream
-        );
+        static constexpr auto value =
+            glz::object("model", &T::model, "prompt", &T::prompt, "stream", &T::stream);
     };
 };
 
-} // namespace malama::network
+}  // namespace malama::network

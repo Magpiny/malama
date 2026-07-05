@@ -11,19 +11,19 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include "network/ollama_client.hpp"
-#include "core/models.hpp"
-
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <functional>
+
+#include "core/models.hpp"
+#include "network/ollama_client.hpp"
 
 namespace malama::network {
 
 class StreamWorker final {
-public:
+   public:
     explicit StreamWorker(std::unique_ptr<OllamaClient> client_ptr) noexcept;
     ~StreamWorker() = default;
 
@@ -32,19 +32,17 @@ public:
     StreamWorker(StreamWorker &&) noexcept = default;
     auto operator=(StreamWorker &&) noexcept -> StreamWorker & = default;
 
-    auto InitializeGeneration(
-        std::string_view model_name,
-        std::string_view prompt_text,
-        const std::vector<core::Message> &history_context,
-        std::function<void(std::string_view, bool)> token_callback
-    ) noexcept -> void;
+    auto InitializeGeneration(std::string_view model_name, std::string_view prompt_text,
+                              const std::vector<core::Message> &history_context,
+                              std::function<void(std::string_view, bool)> token_callback) noexcept
+        -> void;
 
     auto IngestRawNetworkBytes(std::string_view incoming_bytes) noexcept -> void;
 
-private:
+   private:
     std::unique_ptr<OllamaClient> m_client_ptr;
     std::function<void(std::string_view, bool)> m_token_callback;
     std::string m_residual_buffer{};
 };
 
-} // namespace malama::network
+}  // namespace malama::network

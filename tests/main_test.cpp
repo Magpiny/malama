@@ -11,9 +11,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <gtest/gtest.h>
-
-#include <new>
 #include <memory>
+#include <new>
 #include <string>
 #include <string_view>
 
@@ -79,7 +78,7 @@ TEST(NothrowAllocationGuard, SmallAllocationWithNothrowSucceeds) {
     int *const raw_ptr = new (std::nothrow) int(42);
     ASSERT_NE(raw_ptr, nullptr);
     EXPECT_EQ(*raw_ptr, 42);
-    delete raw_ptr; // NOLINT(cppcoreguidelines-owning-memory)
+    delete raw_ptr;  // NOLINT(cppcoreguidelines-owning-memory)
 }
 
 TEST(NothrowAllocationGuard, NullptrBranchReturnsFalseConvention) {
@@ -93,11 +92,11 @@ TEST(NothrowAllocationGuard, NullptrBranchReturnsFalseConvention) {
 
 TEST(NothrowAllocationGuard, NonNullPtrBranchContinues) {
     // Mirrors the success path: a valid frame pointer means init proceeds.
-    auto *simulated_frame_ptr = new (std::nothrow) int(1); // NOLINT
+    auto *simulated_frame_ptr = new (std::nothrow) int(1);  // NOLINT
     ASSERT_NE(simulated_frame_ptr, nullptr);
     const bool init_would_succeed = (simulated_frame_ptr != nullptr);
     EXPECT_TRUE(init_would_succeed);
-    delete simulated_frame_ptr; // NOLINT(cppcoreguidelines-owning-memory)
+    delete simulated_frame_ptr;  // NOLINT(cppcoreguidelines-owning-memory)
 }
 
 // ---------------------------------------------------------------------------
@@ -111,9 +110,9 @@ TEST(WxQueueEventGuard, EventPtrNullSkipsQueueing) {
     // Regression: if event_ptr is null the lambda must skip SetString/wxQueueEvent
     // to avoid dereferencing null. Verify the guard behaves correctly.
     bool queue_was_called = false;
-    int *const event_ptr = nullptr; // simulates new (std::nothrow) returning null
+    int *const event_ptr = nullptr;  // simulates new (std::nothrow) returning null
     if (event_ptr) {
-        queue_was_called = true; // would call wxQueueEvent in production
+        queue_was_called = true;  // would call wxQueueEvent in production
     }
     EXPECT_FALSE(queue_was_called);
 }
@@ -121,12 +120,12 @@ TEST(WxQueueEventGuard, EventPtrNullSkipsQueueing) {
 TEST(WxQueueEventGuard, ValidEventPtrEntersQueueBranch) {
     // When allocation succeeds the branch must be entered.
     bool queue_was_called = false;
-    auto *event_ptr = new (std::nothrow) int(0); // simulates successful allocation
+    auto *event_ptr = new (std::nothrow) int(0);  // simulates successful allocation
     if (event_ptr) {
         queue_was_called = true;
     }
     EXPECT_TRUE(queue_was_called);
-    delete event_ptr; // NOLINT(cppcoreguidelines-owning-memory)
+    delete event_ptr;  // NOLINT(cppcoreguidelines-owning-memory)
 }
 
 // ---------------------------------------------------------------------------
