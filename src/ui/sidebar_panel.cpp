@@ -151,7 +151,7 @@ void SidebarPanel::populate_sidebar() noexcept {
               });
 
     for (const auto &meta : m_active_metadata) {
-        std::string display_text = (meta.m_is_pinned ? "📌 " : "  ") + meta.m_title;
+        std::string display_text = (meta.m_is_pinned ? "📌 " : "💬 ") + meta.m_title;
         m_history_list_ptr->Append(wxString::FromUTF8(display_text.c_str()));
     }
 
@@ -172,7 +172,6 @@ void SidebarPanel::select_session_by_id(const std::string &target_id) noexcept {
     }
 }
 
-// FIXED: Signature captures empty input context with macros cleanly
 void SidebarPanel::on_new_chat_click(wxCommandEvent &WXUNUSED(event)) noexcept {
     if (m_history_list_ptr->GetSelection() != wxNOT_FOUND) {
         m_history_list_ptr->SetSelection(wxNOT_FOUND);
@@ -184,7 +183,6 @@ void SidebarPanel::on_new_chat_click(wxCommandEvent &WXUNUSED(event)) noexcept {
     ProcessWindowEvent(clear_event);
 }
 
-// FIXED: WXUNUSED macro protects against unused warnings on specialized compilation paths
 void SidebarPanel::on_session_selected(wxCommandEvent &WXUNUSED(event)) noexcept {
     int selection_index = m_history_list_ptr->GetSelection();
     if (selection_index == wxNOT_FOUND ||

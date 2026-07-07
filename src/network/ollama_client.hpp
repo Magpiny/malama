@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_client.hpp
-// Purpose:     Boost.Asio Native TCP HTTP Client Interface
+// Purpose:     Asynchronous coroutine-driven HTTP communication controller
 // Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-10
+// Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     Apache-2.0
 // /////////////////////////////////////////////////////////////////////////////
@@ -11,15 +11,15 @@
 
 // SPDX-License-Identifier: Apache-2.0
 
-#include <array>
 #include <atomic>
 #include <boost/asio.hpp>
+#include <expected>
 #include <functional>
 #include <string>
 #include <string_view>
-#include <thread>
+#include <vector>
 
-#include "common/constants.hpp"
+#include "common/types.hpp"
 
 namespace malama::network {
 
@@ -29,31 +29,26 @@ class OllamaClient final {
     ~OllamaClient() noexcept;
 
     OllamaClient(const OllamaClient &) = delete;
-    OllamaClient &operator=(const OllamaClient &) = delete;
+    auto operator=(const OllamaClient &) -> OllamaClient & = delete;
     OllamaClient(OllamaClient &&) noexcept = delete;
-    OllamaClient &operator=(OllamaClient &&) noexcept = delete;
+    auto operator=(OllamaClient &&) noexcept -> OllamaClient & = delete;
 
-    auto SubmitPrompt(std::string_view prompt_text, std::string_view model_name,
-                      std::function<void(std::string_view)> on_data) noexcept -> void;
+    /// @brief Executes a suspended stackless coroutine handling multimodal streaming.
+    /// @param model Target model descriptor profile.
+    /// @param prompt Text input or context injected document block.
+    /// @param image_base64_payload Optional vector containing Base64 formatted visual assets.
+    /// @param on_token Handler triggered asynchronously as stream segments land.
+    auto ExecuteStreamTask(std::string_view model, std::string_view prompt,
+                           const std::vector<std::string> &image_base64_payload,
+                           std::function<void(std::string_view)> on_token) noexcept
+        -> boost::asio::awaitable<std::expected<void, common::NetworkError>>;
 
    private:
-    auto DoResolve() noexcept -> void;
-    auto DoConnect(const boost::asio::ip::tcp::resolver::results_type &endpoints) noexcept -> void;
-    auto DoWrite() noexcept -> void;
-    auto DoRead() noexcept -> void;
-
     boost::asio::io_context m_io_context;
-    boost::asio::ip::tcp::resolver m_resolver;
     boost::asio::ip::tcp::socket m_socket;
-    boost::asio::steady_timer m_operation_timer;
-    std::jthread m_context_thread;
-
     std::string m_host;
     std::string m_port;
-    std::string m_request_buffer;
-    std::array<char, constants::absolute_max_buffer_bytes> m_read_buffer{};
-    std::function<void(std::string_view)> m_on_data_callback;
-    std::atomic<bool> m_operation_in_progress{false};
+    std::atomic<bool> m_is_streaming{false};
 };
 
 }  // namespace malama::network

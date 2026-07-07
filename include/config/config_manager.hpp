@@ -45,7 +45,7 @@ struct AppearanceConfig final {
     // FIXED: Added missing tracking variables for v0.2.6 milestones
     std::string m_sidebar_bg{"#420912"};
     std::string m_sidebar_text{"#f5f5f7"};
-    int m_font_size{11};
+    float m_font_size{13.5};
     std::string m_font_family{"Sans"};
 };
 

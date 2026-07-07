@@ -4,10 +4,10 @@
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-11
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     Apache-GPL-3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3-or-later
 
 #include "network/stream_worker.hpp"
 

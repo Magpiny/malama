@@ -4,12 +4,12 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-11
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3-or-later
 
 #include <functional>
 #include <memory>

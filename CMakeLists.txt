@@ -1,7 +1,7 @@
 # /////////////////////////////////////////////////////////////////////////////
 # Name:        CMakeLists.txt
 # Purpose:     Root modern target-based compilation build for malama
-# Author:      Wanjare S. <samuewanjare@protonmail.com>
+# Author:      Wanjare S. <samuelwanjare@protonmail.com>
 # Created:     2026-06-10
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
 # Licence:     Apache-2.0
@@ -31,10 +31,12 @@ add_executable(malama
     src/ui/sidebar_panel.cpp
     src/ui/chat_panel.cpp
     src/ui/settings_dialog.cpp
+    src/ui/error_banner.cpp
     src/config/config_manager.cpp
     src/engine/markdown/pipeline.cpp
     src/engine/markdown/syntax_registry.cpp
     src/engine/storage/history_manager.cpp
+    src/engine/storage/attachment_manager.cpp
 )
 
 # -----------------------------------------------------------------------------
@@ -55,14 +57,23 @@ target_compile_options(malama PRIVATE
     -D_FORTIFY_SOURCE=2
 )
 
+# Find system threading library needed by Boost Asio/Cobalt async execution loops
+find_package(Threads REQUIRED)
+target_link_libraries(malama PRIVATE Threads::Threads)
+
 # Extract native UI components
 find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 
-# Request Boost system components including compiled binary libraries for regex
-find_package(Boost REQUIRED COMPONENTS regex)
-target_link_libraries(malama PRIVATE Boost::boost Boost::regex)
+# Request Boost components for high-speed I/O, regex, and context switching
+find_package(Boost REQUIRED COMPONENTS regex iostreams context)
+target_link_libraries(malama PRIVATE
+    Boost::boost
+    Boost::regex
+    Boost::iostreams
+    Boost::context
+)
 
 # Find system SQLite3 layout package engine 
 find_package(SQLite3 REQUIRED)
