@@ -1,15 +1,21 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_client.cpp
 // Purpose:     Implements stackless awaitable loops with chunk parsing boundaries
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare <wanpiny.dev>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-V3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #include "network/ollama_client.hpp"
 
+#include <algorithm>
 #include <array>
+#include <boost/asio/as_tuple.hpp>
+#include <boost/asio/this_coro.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/cobalt/generator.hpp>
 #include <format>
 #include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
@@ -19,108 +25,160 @@
 namespace malama::network {
 
 struct MultimodalPayload final {
-    std::string model;
-    std::string prompt;
-    bool stream{true};
-    std::vector<std::string> images{};
+    std::string m_model;
+    std::string m_prompt;
+    bool m_stream{true};
+    std::vector<std::string> m_images;
 
     struct glaze {
         using T = MultimodalPayload;
-        static constexpr auto value = glz::object("model", &T::model, "prompt", &T::prompt,
-                                                  "stream", &T::stream, "images", &T::images);
+        static constexpr auto value = glz::object("model", &T::m_model, "prompt", &T::m_prompt,
+                                                  "stream", &T::m_stream, "images", &T::m_images);
     };
 };
 
 struct ResponseChunk final {
-    std::string response;
-    bool done{false};
+    std::string m_response;
+    bool m_done{false};
 
     struct glaze {
         using T = ResponseChunk;
-        static constexpr auto value = glz::object("response", &T::response, "done", &T::done);
+        static constexpr auto value = glz::object("response", &T::m_response, "done", &T::m_done);
     };
 };
 
-OllamaClient::OllamaClient(std::string host, std::string port) noexcept
-    : m_socket(m_io_context), m_host(std::move(host)), m_port(std::move(port)) {}
+OllamaClient::OllamaClient(std::string host_name, std::string port_number) noexcept
+    : m_socket(m_io_context),
+      m_host(std::move(host_name)),
+      m_port(std::move(port_number)),
+      m_work_guard(boost::asio::make_work_guard(m_io_context)),
+      m_worker_thread([this]() { m_io_context.run(); }) {}
 
 OllamaClient::~OllamaClient() noexcept {
-    boost::system::error_code ec;
-    m_socket.close(ec);
+    m_work_guard.reset();
+    m_io_context.stop();
+    if (m_worker_thread.joinable()) {
+        m_worker_thread.join();
+    }
+    boost::system::error_code error_code;
+    m_socket.close(error_code);
 }
 
-auto OllamaClient::ExecuteStreamTask(std::string_view model, std::string_view prompt,
-                                     const std::vector<std::string> &image_base64_payload,
-                                     std::function<void(std::string_view)> on_token) noexcept
-    -> boost::asio::awaitable<std::expected<void, common::NetworkError>> {
+auto OllamaClient::GetExecutor() noexcept -> boost::asio::io_context::executor_type {
+    return m_io_context.get_executor();
+}
+
+auto OllamaClient::CheckCache(const std::string &cache_key) noexcept -> std::optional<std::string> {
+    auto iterator = m_cache_store.m_lookup_table.find(cache_key);
+    if (iterator != m_cache_store.m_lookup_table.end()) {
+        spdlog::info("In-memory cache hit achieved for prompt signature context.");
+        return iterator->second;
+    }
+    return std::nullopt;
+}
+
+auto OllamaClient::UpdateCache(const std::string &cache_key,
+                               const std::string &response_value) noexcept -> void {
+    if (m_cache_store.m_lookup_table.size() >= ResponseCache::max_cache_entries) {
+        std::string oldest_key = m_cache_store.m_access_order.front();
+        m_cache_store.m_lookup_table.erase(oldest_key);
+        m_cache_store.m_access_order.erase(m_cache_store.m_access_order.begin());
+    }
+    m_cache_store.m_lookup_table[cache_key] = response_value;
+    m_cache_store.m_access_order.push_back(cache_key);
+}
+
+auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_view prompt_text,
+                                     const std::vector<std::string> &images_payload,
+                                     std::function<void(std::string_view)> token_callback) noexcept
+    -> boost::cobalt::task<std::expected<void, common::NetworkError>> {
     if (m_is_streaming.load()) {
         co_return std::unexpected(common::NetworkError::HostUnreachable);
     }
 
-    m_is_streaming.store(true);
-    boost::asio::ip::tcp::resolver resolver(co_await boost::asio::this_coro::executor);
+    std::string cache_key = std::format("{}:{}", model_name, prompt_text);
+    auto cached_response = CheckCache(cache_key);
+    if (cached_response.has_value() && token_callback) {
+        token_callback(cached_response.value());
+        co_return std::expected<void, common::NetworkError>{};
+    }
 
-    auto endpoints = co_await resolver.async_resolve(m_host, m_port, boost::asio::as_tuple);
-    if (std::get<0>(endpoints)) {
+    m_is_streaming.store(true);
+    auto executor = co_await boost::asio::this_coro::executor;
+    boost::asio::ip::tcp::resolver resolver(executor);
+
+    auto endpoints_result = co_await resolver.async_resolve(m_host, m_port, boost::asio::as_tuple);
+    if (std::get<0>(endpoints_result)) {
         m_is_streaming.store(false);
         co_return std::unexpected(common::NetworkError::HostUnreachable);
     }
 
-    // Split parameters to satisfy your 100-character line length limits
-    const auto &results = std::get<1>(endpoints);
-    co_await m_socket.async_connect(results.begin()->endpoint(), boost::asio::as_tuple);
+    boost::beast::tcp_stream stream(executor);
+    co_await stream.async_connect(std::get<1>(endpoints_result), boost::asio::as_tuple);
 
-    MultimodalPayload payload{.model = std::string(model),
-                              .prompt = std::string(prompt),
-                              .stream = true,
-                              .images = image_base64_payload};
+    MultimodalPayload payload{.m_model = std::string(model_name),
+                              .m_prompt = std::string(prompt_text),
+                              .m_stream = true,
+                              .m_images = images_payload};
 
     std::string json_body;
-    // Captured return value explicitly to satisfy [[nodiscard]] checks
-    [[maybe_unused]] const auto write_ec = glz::write_json(payload, json_body);
+    [[maybe_unused]] const auto write_error = glz::write_json(payload, json_body);
 
-    std::string http_request = std::format(
-        "POST /api/generate HTTP/1.1\r\n"
-        "Host: {}:{}\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: {}\r\n"
-        "Connection: close\r\n\r\n{}",
-        m_host, m_port, json_body.size(), json_body);
+    boost::beast::http::request<boost::beast::http::string_body> request_packet{
+        boost::beast::http::verb::post, "/api/generate", 11};
+    request_packet.set(boost::beast::http::field::host, m_host);
+    request_packet.set(boost::beast::http::field::content_type, "application/json");
+    request_packet.body() = json_body;
+    request_packet.prepare_payload();
 
-    co_await boost::asio::async_write(m_socket, boost::asio::buffer(http_request),
-                                      boost::asio::as_tuple);
+    co_await boost::beast::http::async_write(stream, request_packet, boost::asio::as_tuple);
 
-    std::array<char, 4096> read_buffer{};
-    std::string accumulation_line;
+    boost::beast::flat_buffer static_buffer;
+    boost::beast::http::response_parser<boost::beast::http::string_body> response_parser;
+    response_parser.body_limit(std::numeric_limits<std::uint64_t>::max());
 
-    while (true) {
-        auto [read_ec, length] = co_await m_socket.async_read_some(boost::asio::buffer(read_buffer),
-                                                                   boost::asio::as_tuple);
+    co_await boost::beast::http::async_read_header(stream, static_buffer, response_parser,
+                                                   boost::asio::as_tuple);
 
-        if (length > 0) {
-            accumulation_line.append(read_buffer.data(), length);
-            std::size_t position = 0;
-            while ((position = accumulation_line.find('\n')) != std::string::npos) {
-                std::string line = accumulation_line.substr(0, position);
-                accumulation_line.erase(0, position + 1);
+    std::string complete_stream_accumulation;
+    while (!response_parser.is_done()) {
+        auto [read_error, bytes_transferred] = co_await boost::beast::http::async_read_some(
+            stream, static_buffer, response_parser, boost::asio::as_tuple);
 
-                if (!line.empty() && line.front() == '{') {
-                    ResponseChunk chunk;
-                    auto err = glz::read<glz::opts{.error_on_unknown_keys = false}>(chunk, line);
-                    if (!err && on_token) {
-                        on_token(chunk.response);
+        if (bytes_transferred > 0) {
+            auto &body_chunk = response_parser.get().body();
+            if (!body_chunk.empty()) {
+                std::string_view incremental_view(body_chunk);
+                std::size_t position = 0;
+                while ((position = incremental_view.find('\n')) != std::string_view::npos) {
+                    std::string line = std::string(incremental_view.substr(0, position));
+                    incremental_view.remove_prefix(position + 1);
+
+                    if (!line.empty() && line.front() == '{') {
+                        ResponseChunk chunk;
+                        auto parser_error =
+                            glz::read<glz::opts{.error_on_unknown_keys = false}>(chunk, line);
+
+                        if (!parser_error && token_callback) {
+                            token_callback(chunk.m_response);
+                            complete_stream_accumulation += chunk.m_response;
+                        }
                     }
                 }
+                body_chunk.clear();
             }
         }
 
-        if (read_ec == boost::asio::error::eof || read_ec) {
+        if (read_error == boost::beast::http::error::end_of_stream || read_error) {
             break;
         }
     }
 
+    if (!complete_stream_accumulation.empty()) {
+        UpdateCache(cache_key, complete_stream_accumulation);
+    }
+
     m_is_streaming.store(false);
-    // Explicit return initialization to resolve template matching failures
     co_return std::expected<void, common::NetworkError>{};
 }
 

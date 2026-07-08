@@ -10,6 +10,7 @@
 #include "engine/storage/attachment_manager.hpp"
 
 #include <boost/iostreams/device/mapped_file.hpp>
+#include <common/constants.hpp>
 #include <filesystem>
 #include <spdlog/spdlog.h>
 
@@ -19,14 +20,14 @@ namespace fs = std::filesystem;
 
 auto AttachmentManager::AnalyzeAndAdd(const std::string &file_path) noexcept
     -> std::expected<AttachmentInfo, IngestionError> {
-    std::error_code ec;
-    if (!fs::exists(file_path, ec)) {
+    std::error_code err_code;
+    if (!fs::exists(file_path, err_code)) {
         spdlog::warn("Attachment target missing: {}", file_path);
         return std::unexpected(IngestionError::FILE_NOT_FOUND);
     }
 
-    const auto size_bytes = fs::file_size(file_path, ec);
-    if (ec) {
+    const auto size_bytes = fs::file_size(file_path, err_code);
+    if (err_code) {
         return std::unexpected(IngestionError::READ_FAULT);
     }
 
@@ -36,7 +37,7 @@ auto AttachmentManager::AnalyzeAndAdd(const std::string &file_path) noexcept
     if (extension == ".jpeg" || extension == ".jpg" || extension == ".png") {
         target_type = AttachmentType::IMAGE;
         // Strictly enforce your 4MB vision VRAM protection constraint ceiling
-        if (size_bytes > 4 * 1024 * 1024) {
+        if (size_bytes > 4 * constants::absolute_max_buffer_bytes) {
             spdlog::error("Visual asset size boundary violation: {} bytes", size_bytes);
             return std::unexpected(IngestionError::IMAGE_TOO_LARGE);
         }

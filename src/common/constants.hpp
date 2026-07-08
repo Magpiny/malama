@@ -19,6 +19,7 @@ namespace malama::constants {
 // Default Window Sizing Metrics
 inline constexpr int default_window_width = 1200;
 inline constexpr int default_window_height = 800;
+inline constexpr int default_font_size = 13;
 
 // Internal API & Network Target Anchors (Strictly Used as Initial Configuration Fallbacks)
 inline constexpr std::string_view default_ollama_endpoint = "http://localhost:11434";
@@ -29,7 +30,7 @@ inline constexpr std::string_view ollama_chat_path = "/api/chat";  // Unified ch
 inline constexpr std::string_view fallback_model_name = "ornith:latest";
 
 // Memory & Processing Constraints
-inline constexpr std::size_t absolute_max_buffer_bytes = 8192;
+inline constexpr std::size_t absolute_max_buffer_bytes = 1024UZ * 1024UZ;
 inline constexpr std::size_t default_context_window_limit = 4048;
 
 // Protocol Handshake Definitions

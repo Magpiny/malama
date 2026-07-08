@@ -1,26 +1,37 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/chat_panel.cpp
-// Purpose:     Implements the composite layout, visual asset chips, and safety gates
+// Purpose:     Implements composite layouts, hover cursors, and system toasts
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #include "ui/chat_panel.hpp"
 
 #include <new>
+#include <wx/clipbrd.h>
+#include <wx/dataobj.h>
+#include <wx/file.h>
 #include <wx/filedlg.h>
+#include <wx/notifmsg.h>
 #include <wx/sizer.h>
+#include <wx/stattext.h>
 
 #include "common/constants.hpp"
 #include "config/config_manager.hpp"
 #include "engine/markdown/pipeline.hpp"
+#include "network/base64.hpp"
 
 namespace malama::ui {
 
 wxDEFINE_EVENT(EVT_USER_PROMPT, wxCommandEvent);
 wxDEFINE_EVENT(EVT_CANCEL_GENERATION, wxCommandEvent);
+
+inline constexpr int input_control_box_height = 60;
+inline constexpr int main_layout_spacing = 8;
+inline constexpr int tray_layout_spacing = 4;
+inline constexpr int control_element_padding = 6;
 
 ChatPanel::ChatPanel(wxWindow *parent_ptr)
     : wxPanel(parent_ptr, wxID_ANY),
@@ -35,10 +46,8 @@ void ChatPanel::setup_layout() noexcept {
     m_chat_display_ptr = new (std::nothrow)
         wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
 
-    // Inject our inline security and error notification banner
     m_error_banner_ptr = new (std::nothrow) ErrorBanner(this);
 
-    // Setup the isolated Attachment Chip Panel Workspace
     m_tray_container_ptr = new (std::nothrow) wxPanel(this, wxID_ANY);
     m_tray_sizer_ptr = new (std::nothrow) wxBoxSizer(wxHORIZONTAL);
     m_tray_container_ptr->SetSizer(m_tray_sizer_ptr);
@@ -50,9 +59,9 @@ void ChatPanel::setup_layout() noexcept {
     m_attach_button_ptr =
         new (std::nothrow) wxButton(this, wxID_ANY, wxString::FromUTF8("📎"), wxDefaultPosition,
                                     wxDefaultSize, wxBU_EXACTFIT | wxBORDER_NONE);
-    m_prompt_input_ptr =
-        new (std::nothrow) wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxSize(-1, 60),
-                                      wxTE_MULTILINE | wxTE_PROCESS_ENTER | wxBORDER_NONE);
+    m_prompt_input_ptr = new (std::nothrow)
+        wxTextCtrl(this, wxID_ANY, "", wxDefaultPosition, wxSize(-1, input_control_box_height),
+                   wxTE_MULTILINE | wxTE_PROCESS_ENTER | wxBORDER_NONE);
     m_spinner_ptr = new (std::nothrow) wxActivityIndicator(this, wxID_ANY);
     m_copy_button_ptr = new (std::nothrow)
         wxButton(this, wxID_ANY, wxString::FromUTF8("📋 Copy"), wxDefaultPosition, wxDefaultSize,
@@ -67,20 +76,37 @@ void ChatPanel::setup_layout() noexcept {
         return;
     }
 
+    m_attach_button_ptr->SetToolTip("Attach files or visual assets to current prompt context");
+    m_attach_button_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
+
+    m_spinner_ptr->SetToolTip("Forcibly interrupt current generation thread stream loop");
+    m_spinner_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
+
+    m_copy_button_ptr->SetToolTip("Copy full response raw text content to clipboard");
+    m_copy_button_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
+
+    m_send_button_ptr->SetToolTip("Dispatch collected content buffers directly to local LLM");
+    m_send_button_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
+
     m_spinner_ptr->Hide();
     m_raw_markdown_history = "### System Channel\n`malama v0.2.7-multimodal` ready.\n\n---";
     render_chat_stream();
 
-    input_control_sizer->Add(m_attach_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL, 4);
-    input_control_sizer->Add(m_prompt_input_ptr, 1, wxEXPAND | wxALL, 4);
-    input_control_sizer->Add(m_spinner_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL, 4);
-    input_control_sizer->Add(m_copy_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL, 4);
-    input_control_sizer->Add(m_send_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL, 4);
+    input_control_sizer->Add(m_attach_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL,
+                             control_element_padding);
+    input_control_sizer->Add(m_prompt_input_ptr, 1, wxEXPAND | wxALL, control_element_padding);
+    input_control_sizer->Add(m_spinner_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL,
+                             control_element_padding);
+    input_control_sizer->Add(m_copy_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL,
+                             control_element_padding);
+    input_control_sizer->Add(m_send_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL,
+                             control_element_padding);
 
-    main_sizer->Add(m_chat_display_ptr, 1, wxEXPAND | wxALL, 6);
-    main_sizer->Add(m_error_banner_ptr, 0, wxEXPAND | wxLEFT | wxRIGHT, 6);
-    main_sizer->Add(m_tray_container_ptr, 0, wxEXPAND | wxLEFT | wxRIGHT, 6);
-    main_sizer->Add(input_control_sizer, 0, wxEXPAND | wxALL, 6);
+    main_sizer->Add(m_chat_display_ptr, 1, wxEXPAND | wxALL, main_layout_spacing);
+    main_sizer->Add(m_error_banner_ptr, 0, wxEXPAND | wxLEFT | wxRIGHT, main_layout_spacing);
+    main_sizer->Add(m_tray_container_ptr, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,
+                    tray_layout_spacing);
+    main_sizer->Add(input_control_sizer, 0, wxEXPAND | wxALL, main_layout_spacing);
 
     SetSizer(main_sizer);
 }
@@ -90,15 +116,31 @@ void ChatPanel::bind_events() noexcept {
     m_attach_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_attach_action, this);
     m_copy_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_copy_action, this);
     m_prompt_input_ptr->Bind(wxEVT_KEY_DOWN, &ChatPanel::on_prompt_key_down, this);
+    m_chat_display_ptr->Bind(wxEVT_HTML_LINK_CLICKED, &ChatPanel::on_link_clicked, this);
+
+    m_spinner_ptr->Bind(wxEVT_LEFT_DOWN, &ChatPanel::on_spinner_mouse_down, this);
+}
+
+void ChatPanel::on_spinner_mouse_down(wxMouseEvent &WXUNUSED(event)) noexcept {
+    stop_spinner();
+
+    wxCommandEvent cancel_event(EVT_CANCEL_GENERATION, GetId());
+    cancel_event.SetEventObject(this);
+    wxPostEvent(this, cancel_event);
+
+    wxNotificationMessage notification("malama", "Local inference execution loop interrupted.");
+    notification.Show(wxICON_INFORMATION);
 }
 
 void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     m_error_banner_ptr->HideAlert();
 
-    wxFileDialog file_dialog(
-        this, "Select File Assets for Ingestion", "", "",
-        "All Support Formats|*.txt;*.cpp;*.hpp;*.py;*.json;*.log;*.png;*.jpg;*.jpeg",
-        wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE);
+    const wxString support_wildcard =
+        "All Support Formats|"
+        "*.txt;*.cpp;*.hpp;*.py;*.json;*.log;*.pdf;*.png;*.jpg;*.jpeg";
+
+    wxFileDialog file_dialog(this, "Select File Assets for Ingestion", "", "", support_wildcard,
+                             wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE);
 
     if (file_dialog.ShowModal() == wxID_CANCEL) {
         return;
@@ -115,7 +157,7 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
             switch (result.error()) {
                 case engine::storage::IngestionError::IMAGE_TOO_LARGE: {
                     m_error_banner_ptr->ShowAlert(
-                        "File boundary crossed: Images must be under 4MB to protect VRAM paths.",
+                        "File limit crossed: Vision targets must be under 4MB to protect VRAM.",
                         BannerState::ERROR);
                     break;
                 }
@@ -158,11 +200,11 @@ void ChatPanel::refresh_attachment_tray() noexcept {
             wxStaticText(chip, wxID_ANY, wxString::FromUTF8(prefix + info.m_file_name));
         label->SetForegroundColour(wxColour("#F5F5F7"));
 
-        chip_sizer->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxALL, 4);
+        chip_sizer->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxALL, control_element_padding);
         chip->SetSizer(chip_sizer);
         chip->SetBackgroundColour(wxColour("#420912"));
 
-        m_tray_sizer_ptr->Add(chip, 0, wxALIGN_CENTER_VERTICAL | wxALL, 4);
+        m_tray_sizer_ptr->Add(chip, 0, wxALIGN_CENTER_VERTICAL | wxALL, control_element_padding);
     }
 
     m_tray_container_ptr->Show();
@@ -177,18 +219,36 @@ void ChatPanel::on_send_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 
     m_prompt_input_ptr->Clear();
     std::string final_processed_prompt = raw_prompt.ToStdString();
+    std::string image_layout_indicators;
+    std::vector<std::string> base64_images;
 
-    // Context Injection Loop for Text Documents
-    for (const auto &file : m_attachment_engine->GetPendingAttachments()) {
-        if (file.m_type == engine::storage::AttachmentType::TEXT_DOCUMENT) {
-            auto text_extraction = m_attachment_engine->ExtractTextContent(file);
+    for (const auto &file_info : m_attachment_engine->GetPendingAttachments()) {
+        if (file_info.m_type == engine::storage::AttachmentType::TEXT_DOCUMENT) {
+            auto text_extraction = m_attachment_engine->ExtractTextContent(file_info);
             if (text_extraction) {
                 final_processed_prompt += text_extraction.value();
+            }
+        } else if (file_info.m_type == engine::storage::AttachmentType::IMAGE) {
+            image_layout_indicators +=
+                std::format("\n\n🖼️ *Attached Image Snapshot: {}*", file_info.m_file_name);
+
+            wxFile image_file(file_info.m_file_path, wxFile::read);
+            if (image_file.IsOpened()) {
+                const std::size_t file_length = image_file.Length();
+                std::vector<char> byte_buffer(file_length);
+                image_file.Read(byte_buffer.data(), byte_buffer.size());
+
+                std::string raw_binary_string(byte_buffer.begin(), byte_buffer.end());
+                base64_images.push_back(malama::network::encode_base64(raw_binary_string));
             }
         }
     }
 
-    append_user_message(raw_prompt.ToStdString());
+    append_user_message(raw_prompt.ToStdString() + image_layout_indicators);
+
+    if (!base64_images.empty()) {
+        malama::network::ImageTransit::SetPendingImages(std::move(base64_images));
+    }
 
     wxCommandEvent custom_event(EVT_USER_PROMPT, GetId());
     custom_event.SetString(
@@ -197,6 +257,12 @@ void ChatPanel::on_send_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 
     m_attachment_engine->ClearQueue();
     refresh_attachment_tray();
+}
+
+void ChatPanel::scroll_to_bottom() noexcept {
+    if (m_chat_display_ptr != nullptr) {
+        m_chat_display_ptr->Scroll(0, m_chat_display_ptr->GetVirtualSize().GetHeight());
+    }
 }
 
 void ChatPanel::render_chat_stream() noexcept {
@@ -215,6 +281,9 @@ void ChatPanel::render_chat_stream() noexcept {
         theme.m_bg_color, theme.m_text_primary, html_body);
 
     m_chat_display_ptr->SetPage(wxString::FromUTF8(complete_html.data(), complete_html.size()));
+
+    // Auto scrolls to capture fresh generation tokens dynamically
+    scroll_to_bottom();
 }
 
 void ChatPanel::append_token(std::string_view token_segment) noexcept {
@@ -228,7 +297,14 @@ void ChatPanel::append_user_message(std::string_view message) noexcept {
         m_raw_markdown_history += "\n" + m_active_response_stream + "\n\n---";
         m_active_response_stream.clear();
     }
-    m_raw_markdown_history += "\n\n### 👤 User\n" + std::string(message) + "\n\n### 🤖 malama\n";
+
+    std::string lookahead_match = std::string(message);
+
+    if (m_raw_markdown_history.find(lookahead_match) != std::string::npos) {
+        return;
+    }
+
+    m_raw_markdown_history += "\n\n### 👤 User\n" + lookahead_match + "\n\n### 🤖 malama\n";
     render_chat_stream();
 }
 
@@ -248,6 +324,9 @@ void ChatPanel::load_history(const core::ChatSession &session) noexcept {
         }
     }
     render_chat_stream();
+
+    // Position the layout engine directly onto the recent dialogue frames at bottom
+    scroll_to_bottom();
 }
 
 auto ChatPanel::get_active_response_stream() const noexcept -> std::string {
@@ -264,18 +343,119 @@ void ChatPanel::on_prompt_key_down(wxKeyEvent &event) noexcept {
 }
 
 void ChatPanel::on_copy_action(wxCommandEvent &WXUNUSED(event)) noexcept {
-    // Retained from parent reference rules for tracking actions
+    if (wxTheClipboard->Open()) {
+        std::string target_text =
+            m_active_response_stream.empty() ? m_last_llm_response : m_active_response_stream;
+
+        if (!target_text.empty()) {
+            auto *data_obj = new (std::nothrow)
+                wxTextDataObject(wxString::FromUTF8(target_text.data(), target_text.size()));
+            if (data_obj != nullptr) {
+                wxTheClipboard->SetData(data_obj);
+
+                wxNotificationMessage system_toast("malama", "Full dialogue response text copied.");
+                system_toast.Show(wxICON_INFORMATION);
+            }
+        }
+        wxTheClipboard->Close();
+    }
+}
+
+// Add these helper definitions or declare them as private methods in chat_panel.hpp
+
+[[nodiscard]] auto decode_hex_payload(std::string_view hex_payload) -> std::string {
+    std::string decoded_string;
+    decoded_string.reserve(hex_payload.size() / 2uz);
+
+    inline constexpr int hex_base_system = 16;
+    inline constexpr int nibble_bit_shift = 4;
+    inline constexpr int alphabet_ascii_offset = 10;
+
+    for (std::size_t index = 0; index + 1 < hex_payload.size(); index += 2) {
+        char high_character = hex_payload[index];
+        char low_character = hex_payload[index + 1];
+
+        int high_value = (high_character >= 'A') ? (high_character - 'A' + alphabet_ascii_offset)
+                                                 : (high_character - '0');
+
+        int low_value = (low_character >= 'A') ? (low_character - 'A' + alphabet_ascii_offset)
+                                               : (low_character - '0');
+
+        decoded_string.push_back(static_cast<char>((high_value << nibble_bit_shift) | low_value));
+    }
+    return decoded_string;
+}
+
+void ChatPanel::handle_code_copy(std::string_view hex_payload) noexcept {
+    const std::string raw_code = decode_hex_payload(hex_payload);
+
+    if (!wxTheClipboard->Open()) {
+        return;
+    }
+
+    auto *data_obj =
+        new (std::nothrow) wxTextDataObject(wxString::FromUTF8(raw_code.data(), raw_code.size()));
+
+    if (data_obj != nullptr) {
+        wxTheClipboard->SetData(data_obj);
+        wxNotificationMessage toast("malama", "Code snippet block copied to clipboard.");
+        toast.Show(wxICON_INFORMATION);
+    }
+    wxTheClipboard->Close();
+}
+
+void ChatPanel::handle_code_download(std::string_view hex_payload) noexcept {
+    const std::string raw_code = decode_hex_payload(hex_payload);
+
+    wxFileDialog save_dialog(this, "Save code block snippet", "", "", "All files (*.*)|*.*",
+                             wxFD_SAVE | wxFD_OVERWRITE_PROMPT);
+
+    if (save_dialog.ShowModal() != wxID_OK) {
+        return;
+    }
+
+    const wxString file_path = save_dialog.GetPath();
+    wxFile local_file(file_path, wxFile::write);
+
+    if (local_file.IsOpened()) {
+        local_file.Write(raw_code.data(), raw_code.size());
+        local_file.Close();
+
+        wxNotificationMessage toast("malama", "Source snippet file exported successfully.");
+        toast.Show(wxICON_INFORMATION);
+    }
+}
+
+void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
+    const wxString href = event.GetLinkInfo().GetHref();
+
+    constexpr std::size_t copy_prefix_length = 19UZ;
+    constexpr std::size_t download_prefix_length = 23UZ;
+
+    if (href.StartsWith("malama://copy_code:")) {
+        const wxString hex_part = href.Mid(copy_prefix_length);
+        handle_code_copy(hex_part.ToStdString());
+    } else if (href.StartsWith("malama://download_code:")) {
+        const wxString hex_part = href.Mid(download_prefix_length);
+        handle_code_download(hex_part.ToStdString());
+    } else {
+        event.Skip();
+    }
 }
 
 void ChatPanel::start_spinner() noexcept {
-    m_spinner_ptr->Show();
-    m_spinner_ptr->Start();
+    if (m_spinner_ptr != nullptr) {
+        m_spinner_ptr->Show();
+        m_spinner_ptr->Start();
+    }
     Layout();
 }
 
 void ChatPanel::stop_spinner() noexcept {
-    m_spinner_ptr->Stop();
-    m_spinner_ptr->Hide();
+    if (m_spinner_ptr != nullptr) {
+        m_spinner_ptr->Stop();
+        m_spinner_ptr->Hide();
+    }
     Layout();
 }
 

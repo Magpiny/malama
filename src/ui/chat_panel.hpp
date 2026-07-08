@@ -4,12 +4,12 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3-or-later
 
 #include <memory>
 #include <string>
@@ -60,7 +60,9 @@ class ChatPanel final : public wxPanel {
     void on_send_action(wxCommandEvent &event) noexcept;
     void on_attach_action(wxCommandEvent &event) noexcept;
     void on_copy_action(wxCommandEvent &event) noexcept;
+    void on_link_clicked(wxHtmlLinkEvent &event) noexcept;
     void on_prompt_key_down(wxKeyEvent &event) noexcept;
+    void on_spinner_mouse_down(wxMouseEvent &event) noexcept;
 
     wxHtmlWindow *m_chat_display_ptr{nullptr};
     ErrorBanner *m_error_banner_ptr{nullptr};

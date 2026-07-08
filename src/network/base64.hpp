@@ -4,15 +4,15 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
-
+#include <mutex>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace malama::network {
 
@@ -48,5 +48,23 @@ namespace malama::network {
 
     return output;
 }
+
+/// @brief Thread-safe synchronized staging transit layer for multimodal image payloads
+class ImageTransit final {
+   public:
+    static auto SetPendingImages(std::vector<std::string> images) noexcept -> void {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_images = std::move(images);
+    }
+
+    [[nodiscard]] static auto MovePendingImages() noexcept -> std::vector<std::string> {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return std::move(m_images);
+    }
+
+   private:
+    inline static std::vector<std::string> m_images;
+    inline static std::mutex m_mutex;
+};
 
 }  // namespace malama::network

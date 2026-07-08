@@ -44,10 +44,9 @@ add_executable(malama
 # Tells the compiler where to search when declaring #include statements
 # -----------------------------------------------------------------------------
 target_include_directories(malama PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(malama PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_compile_features(malama PUBLIC cxx_std_23)
-
-target_include_directories(malama PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
 target_compile_options(malama PRIVATE
     -Wall -Wextra -Wpedantic -Werror
@@ -66,13 +65,14 @@ find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html)
 include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE ${wxWidgets_LIBRARIES})
 
-# Request Boost components for high-speed I/O, regex, and context switching
-find_package(Boost REQUIRED COMPONENTS regex iostreams context)
+# Request Boost components for high-speed I/O, regex, context, and Cobalt matching
+find_package(Boost REQUIRED COMPONENTS regex iostreams context cobalt)
 target_link_libraries(malama PRIVATE
     Boost::boost
     Boost::regex
     Boost::iostreams
     Boost::context
+    Boost::cobalt
 )
 
 # Find system SQLite3 layout package engine 

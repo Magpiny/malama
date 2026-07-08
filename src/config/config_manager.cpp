@@ -11,9 +11,6 @@
 
 #include "config/config_manager.hpp"
 
-#include <fstream>
-#include <sstream>
-
 namespace malama::config {
 
 auto ConfigManager::get_instance() noexcept -> ConfigManager & {

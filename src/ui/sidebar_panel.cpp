@@ -17,6 +17,7 @@
 #include <spdlog/spdlog.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
+#include <wx/notifmsg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
 #include <wx/textdlg.h>
@@ -70,6 +71,10 @@ void SidebarPanel::setup_layout() noexcept {
     m_new_chat_btn_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
     m_new_chat_btn_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
 
+    // Apply interactive cursor handles and tooltips to New Chat Trigger
+    m_new_chat_btn_ptr->SetToolTip("Initialize a clean conversation workspace session");
+    m_new_chat_btn_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
+
     m_history_list_ptr = new (std::nothrow)
         wxListBox(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, 0, nullptr, wxBORDER_NONE);
     if (m_history_list_ptr == nullptr) {
@@ -79,6 +84,10 @@ void SidebarPanel::setup_layout() noexcept {
         return;
     }
     m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+
+    // Apply interactive cursor handles and tooltips to History Track List
+    m_history_list_ptr->SetToolTip("Navigate sessions or right-click context menu options");
+    m_history_list_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
 
     m_metrics_text_ptr = new (std::nothrow) wxStaticText(this, wxID_ANY, "");
     if (m_metrics_text_ptr == nullptr) {
@@ -196,7 +205,6 @@ void SidebarPanel::on_session_selected(wxCommandEvent &WXUNUSED(event)) noexcept
     ProcessWindowEvent(load_event);
 }
 
-// FIXED: Clean macro mapping strips compiler diagnostic boundaries completely
 void SidebarPanel::on_context_menu(wxContextMenuEvent &WXUNUSED(event)) noexcept {
     if (m_history_manager_ptr == nullptr) {
         return;
@@ -249,6 +257,11 @@ void SidebarPanel::on_context_menu(wxContextMenuEvent &WXUNUSED(event)) noexcept
                 m_history_manager_ptr->DeleteSession(
                     m_active_metadata[selection_index].m_session_id);
                 populate_sidebar();
+
+                // Fire explicit desktop system notification on context thread deletion
+                wxNotificationMessage system_toast(
+                    "malama", "Conversation historical session context deleted.");
+                system_toast.Show(wxICON_INFORMATION);
 
                 wxCommandEvent reset_event(EVT_NEW_CHAT_REQUESTED, GetId());
                 ProcessWindowEvent(reset_event);
