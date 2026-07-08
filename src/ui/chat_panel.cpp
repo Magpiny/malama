@@ -9,19 +9,44 @@
 
 #include "ui/chat_panel.hpp"
 
+#include <cstddef>
+#include <format>
+#include <memory>
 #include <new>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
+#include <wx/activityindicator.h>
+#include <wx/anybutton.h>
+#include <wx/arrstr.h>
 #include <wx/clipbrd.h>
 #include <wx/dataobj.h>
+#include <wx/event.h>
 #include <wx/file.h>
 #include <wx/filedlg.h>
+#include <wx/gdicmn.h>
+#include <wx/generic/panelg.h>
+#include <wx/gtk/activityindicator.h>
+#include <wx/gtk/colour.h>
+#include <wx/gtk/cursor.h>
+#include <wx/gtk/filedlg.h>
+#include <wx/gtk/stattext.h>
+#include <wx/gtk/textctrl.h>
+#include <wx/gtk/window.h>
+#include <wx/html/htmlwin.h>
 #include <wx/notifmsg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
+#include <wx/string.h>
 
 #include "common/constants.hpp"
 #include "config/config_manager.hpp"
+#include "core/models.hpp"
 #include "engine/markdown/pipeline.hpp"
+#include "engine/storage/attachment_manager.hpp"
 #include "network/base64.hpp"
+#include "ui/error_banner.hpp"
 
 namespace malama::ui {
 
@@ -266,7 +291,7 @@ void ChatPanel::scroll_to_bottom() noexcept {
 }
 
 void ChatPanel::render_chat_stream() noexcept {
-    if (!m_chat_display_ptr) {
+    if (m_chat_display_ptr == nullptr) {
         return;
     }
     auto theme = config::ConfigManager::get_instance().get_config().m_appearance;
@@ -362,14 +387,13 @@ void ChatPanel::on_copy_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 }
 
 // Add these helper definitions or declare them as private methods in chat_panel.hpp
+inline constexpr int hex_base_system = 16;
+inline constexpr int nibble_bit_shift = 4;
+inline constexpr int alphabet_ascii_offset = 10;
 
 [[nodiscard]] auto decode_hex_payload(std::string_view hex_payload) -> std::string {
     std::string decoded_string;
-    decoded_string.reserve(hex_payload.size() / 2uz);
-
-    inline constexpr int hex_base_system = 16;
-    inline constexpr int nibble_bit_shift = 4;
-    inline constexpr int alphabet_ascii_offset = 10;
+    decoded_string.reserve(hex_payload.size() / 2UZ);
 
     for (std::size_t index = 0; index + 1 < hex_payload.size(); index += 2) {
         char high_character = hex_payload[index];

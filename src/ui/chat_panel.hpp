@@ -64,6 +64,10 @@ class ChatPanel final : public wxPanel {
     void on_prompt_key_down(wxKeyEvent &event) noexcept;
     void on_spinner_mouse_down(wxMouseEvent &event) noexcept;
 
+    void scroll_to_bottom() noexcept;
+    void handle_code_copy(std::string_view hex_payload) noexcept;
+    void handle_code_download(std::string_view hex_payload) noexcept;
+
     wxHtmlWindow *m_chat_display_ptr{nullptr};
     ErrorBanner *m_error_banner_ptr{nullptr};
     wxBoxSizer *m_tray_sizer_ptr{nullptr};
