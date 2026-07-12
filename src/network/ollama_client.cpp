@@ -24,29 +24,6 @@
 
 namespace malama::network {
 
-struct MultimodalPayload final {
-    std::string m_model;
-    std::string m_prompt;
-    bool m_stream{true};
-    std::vector<std::string> m_images;
-
-    struct glaze {
-        using T = MultimodalPayload;
-        static constexpr auto value = glz::object("model", &T::m_model, "prompt", &T::m_prompt,
-                                                  "stream", &T::m_stream, "images", &T::m_images);
-    };
-};
-
-struct ResponseChunk final {
-    std::string m_response;
-    bool m_done{false};
-
-    struct glaze {
-        using T = ResponseChunk;
-        static constexpr auto value = glz::object("response", &T::m_response, "done", &T::m_done);
-    };
-};
-
 OllamaClient::OllamaClient(std::string host_name, std::string port_number) noexcept
     : m_socket(m_io_context),
       m_host(std::move(host_name)),
@@ -66,6 +43,12 @@ OllamaClient::~OllamaClient() noexcept {
 
 auto OllamaClient::GetExecutor() noexcept -> boost::asio::io_context::executor_type {
     return m_io_context.get_executor();
+}
+
+void OllamaClient::TriggerActiveGenerationCancellation() noexcept {
+    m_cancellation_requested.store(true);
+    boost::system::error_code ignore_error;
+    m_socket.close(ignore_error);
 }
 
 auto OllamaClient::CheckCache(const std::string &cache_key) noexcept -> std::optional<std::string> {
@@ -95,6 +78,9 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
     if (m_is_streaming.load()) {
         co_return std::unexpected(common::NetworkError::HostUnreachable);
     }
+
+    m_cancellation_requested.store(false);
+    m_residual_line_accumulator.clear();
 
     std::string cache_key = std::format("{}:{}", model_name, prompt_text);
     auto cached_response = CheckCache(cache_key);
@@ -142,30 +128,44 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
 
     std::string complete_stream_accumulation;
     while (!response_parser.is_done()) {
+        // Intercept loops securely if user requests cancellation
+        if (m_cancellation_requested.load()) {
+            if (token_callback) {
+                token_callback("\n\n[Prompt generation stopped by the user.]");
+            }
+            stream.close();
+            break;
+        }
+
         auto [read_error, bytes_transferred] = co_await boost::beast::http::async_read_some(
             stream, static_buffer, response_parser, boost::asio::as_tuple);
 
         if (bytes_transferred > 0) {
             auto &body_chunk = response_parser.get().body();
             if (!body_chunk.empty()) {
-                std::string_view incremental_view(body_chunk);
-                std::size_t position = 0;
-                while ((position = incremental_view.find('\n')) != std::string_view::npos) {
-                    std::string line = std::string(incremental_view.substr(0, position));
-                    incremental_view.remove_prefix(position + 1);
+                // FIXED: Append incoming frames directly to our loopahead buffer
+                m_residual_line_accumulator.append(body_chunk);
+                body_chunk.clear();
 
-                    if (!line.empty() && line.front() == '{') {
+                std::size_t newline_position = 0;
+                while ((newline_position = m_residual_line_accumulator.find('\n')) !=
+                       std::string::npos) {
+                    // Create zero-copy views to parse lines without temporary string copies
+                    std::string_view zero_copy_line_view(m_residual_line_accumulator.data(),
+                                                         newline_position);
+
+                    if (!zero_copy_line_view.empty() && zero_copy_line_view.front() == '{') {
                         ResponseChunk chunk;
-                        auto parser_error =
-                            glz::read<glz::opts{.error_on_unknown_keys = false}>(chunk, line);
+                        auto parser_error = glz::read<glz::opts{.error_on_unknown_keys = false}>(
+                            chunk, zero_copy_line_view);
 
                         if (!parser_error && token_callback) {
                             token_callback(chunk.m_response);
                             complete_stream_accumulation += chunk.m_response;
                         }
                     }
+                    m_residual_line_accumulator.erase(0, newline_position + 1);
                 }
-                body_chunk.clear();
             }
         }
 
@@ -174,7 +174,7 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
         }
     }
 
-    if (!complete_stream_accumulation.empty()) {
+    if (!complete_stream_accumulation.empty() && !m_cancellation_requested.load()) {
         UpdateCache(cache_key, complete_stream_accumulation);
     }
 

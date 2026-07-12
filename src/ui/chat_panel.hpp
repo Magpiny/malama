@@ -1,20 +1,19 @@
 // /////////////////////////////////////////////////////////////////////////////
-// Name:        src/ui/chat_panel.hpp
+// Name:        include/ui/chat_panel.hpp
 // Purpose:     Composite multimodal prompt workspace and message canvas layout
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     GPL-3-or-later
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: GPL-3-or-later
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <memory>
 #include <string>
 #include <string_view>
-#include <vector>
 #include <wx/activityindicator.h>
 #include <wx/button.h>
 #include <wx/html/htmlwin.h>
@@ -25,7 +24,6 @@
 #include "engine/storage/attachment_manager.hpp"
 #include "ui/error_banner.hpp"
 
-// Forward declarations to keep headers lean and avoid compilation loops
 class wxBoxSizer;
 
 namespace malama::ui {
@@ -65,7 +63,7 @@ class ChatPanel final : public wxPanel {
     void on_spinner_mouse_down(wxMouseEvent &event) noexcept;
 
     void scroll_to_bottom() noexcept;
-    void handle_code_copy(std::string_view hex_payload) noexcept;
+    static void handle_code_copy(std::string_view hex_payload) noexcept;
     void handle_code_download(std::string_view hex_payload) noexcept;
 
     wxHtmlWindow *m_chat_display_ptr{nullptr};
@@ -78,10 +76,12 @@ class ChatPanel final : public wxPanel {
     wxButton *m_copy_button_ptr{nullptr};
     wxActivityIndicator *m_spinner_ptr{nullptr};
 
-    std::unique_ptr<engine::storage::AttachmentManager> m_attachment_engine;
     std::string m_raw_markdown_history;
     std::string m_active_response_stream;
     std::string m_last_llm_response;
+    std::string m_last_processed_prompt;
+
+    std::unique_ptr<engine::storage::AttachmentManager> m_attachment_engine;
 };
 
 }  // namespace malama::ui

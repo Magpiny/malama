@@ -4,10 +4,11 @@
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-01
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <functional>
 #include <string>
@@ -17,8 +18,6 @@
 #include "config/config_manager.hpp"
 #include "engine/markdown/syntax_registry.hpp"
 #include "engine/markdown/token.hpp"
-
-// SPDX-License-Identifier: Apache-2.0
 
 namespace malama::engine::markdown {
 

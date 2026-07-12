@@ -4,17 +4,16 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
-
+#include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <optional>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace malama::engine::storage {
@@ -26,8 +25,11 @@ enum class AttachmentType : std::uint8_t { TEXT_DOCUMENT, IMAGE };
 enum class IngestionError : std::uint8_t {
     FILE_NOT_FOUND,
     IMAGE_TOO_LARGE,
+    DOCUMENT_TOO_LARGE,
     READ_FAULT,
-    CONTEXT_OVERFLOW
+    CONTEXT_OVERFLOW,
+    PARSING_FAILED,
+    MAX_LIMIT_REACHED
 };
 
 /// @brief Metadata payload block tracking processed attachment files.
@@ -37,41 +39,34 @@ struct AttachmentInfo {
     AttachmentType m_type;
     std::size_t m_size_bytes{0};
     std::size_t m_estimated_tokens{0};
+    std::optional<std::string> m_cached_text;
 };
 
-/// @brief Manages data ingestion pipelines for large text files and local visual formats.
 class AttachmentManager final {
    public:
-    explicit AttachmentManager() = default;
+    AttachmentManager() = default;
     ~AttachmentManager() = default;
 
-    AttachmentManager(const AttachmentManager &) = delete;
-    auto operator=(const AttachmentManager &) -> AttachmentManager & = delete;
+    AttachmentManager(const AttachmentManager &) = default;
+    auto operator=(const AttachmentManager &) -> AttachmentManager & = default;
     AttachmentManager(AttachmentManager &&) noexcept = default;
     auto operator=(AttachmentManager &&) noexcept -> AttachmentManager & = default;
 
-    /// @brief Pre-flight registers and analyzes a target file path.
-    /// @param file_path Absolute file location targeting ingestion.
-    /// @return Meta information on success, structured error flag on failure.
     [[nodiscard]] auto AnalyzeAndAdd(const std::string &file_path) noexcept
-        -> std::expected<AttachmentInfo, IngestionError>;
-
-    /// @brief Erases all current pending files inside the attachment workspace tray.
-    void ClearQueue() noexcept;
-
-    /// @brief Memory-maps and extracts targeted text files safely as injected context blocks.
-    /// @param info Structural description metadata block of the file target.
-    /// @return Content string layout on success, structural enum fault on failure.
-    [[nodiscard]] auto ExtractTextContent(const AttachmentInfo &info) noexcept
-        -> std::expected<std::string, IngestionError>;
+        -> std::expected<void, IngestionError>;
 
     [[nodiscard]] auto GetPendingAttachments() const noexcept
         -> const std::vector<AttachmentInfo> &;
 
-    [[nodiscard]] auto ComputeTotalEstimatedTokens() const noexcept -> std::size_t;
+    auto ClearQueue() noexcept -> void;
+
+    [[nodiscard]] static auto ExtractTextContent(const AttachmentInfo &info) noexcept
+        -> std::optional<std::string>;
+
+    auto RemoveByIndex(std::size_t index) noexcept -> void;
 
    private:
-    std::vector<AttachmentInfo> m_pending_tray;
+    std::vector<AttachmentInfo> m_pending_attachments;
 };
 
 }  // namespace malama::engine::storage

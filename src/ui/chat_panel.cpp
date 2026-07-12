@@ -1,10 +1,10 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/chat_panel.cpp
 // Purpose:     Implements composite layouts, hover cursors, and system toasts
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     GPL-3-or-later
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #include "ui/chat_panel.hpp"
@@ -26,27 +26,14 @@
 #include <wx/file.h>
 #include <wx/filedlg.h>
 #include <wx/gdicmn.h>
-#include <wx/generic/panelg.h>
-#include <wx/gtk/activityindicator.h>
-#include <wx/gtk/colour.h>
-#include <wx/gtk/cursor.h>
-#include <wx/gtk/filedlg.h>
-#include <wx/gtk/stattext.h>
-#include <wx/gtk/textctrl.h>
-#include <wx/gtk/window.h>
-#include <wx/html/htmlwin.h>
 #include <wx/notifmsg.h>
 #include <wx/sizer.h>
 #include <wx/stattext.h>
-#include <wx/string.h>
 
 #include "common/constants.hpp"
 #include "config/config_manager.hpp"
-#include "core/models.hpp"
 #include "engine/markdown/pipeline.hpp"
-#include "engine/storage/attachment_manager.hpp"
 #include "network/base64.hpp"
-#include "ui/error_banner.hpp"
 
 namespace malama::ui {
 
@@ -57,6 +44,35 @@ inline constexpr int input_control_box_height = 60;
 inline constexpr int main_layout_spacing = 8;
 inline constexpr int tray_layout_spacing = 4;
 inline constexpr int control_element_padding = 6;
+inline constexpr int hex_letter_val = 10;
+
+[[nodiscard]] static auto get_hex_value(char character) noexcept -> int {
+    if (character >= '0' && character <= '9') {
+        return character - '0';
+    }
+    if (character >= 'A' && character <= 'F') {
+        return character - 'A' + hex_letter_val;
+    }
+    if (character >= 'a' && character <= 'f') {
+        return character - 'a' + hex_letter_val;
+    }
+    return 0;
+}
+
+inline constexpr int nibble_bit_shift = 4;
+
+[[nodiscard]] static auto decode_hex_payload(std::string_view hex_payload) -> std::string {
+    std::string decoded_string;
+    decoded_string.reserve(hex_payload.size() / 2UZ);
+
+    for (std::size_t index = 0; index + 1 < hex_payload.size(); index += 2) {
+        const int high_value = get_hex_value(hex_payload[index]);
+        const int low_value = get_hex_value(hex_payload[index + 1]);
+
+        decoded_string.push_back(static_cast<char>((high_value << nibble_bit_shift) | low_value));
+    }
+    return decoded_string;
+}
 
 ChatPanel::ChatPanel(wxWindow *parent_ptr)
     : wxPanel(parent_ptr, wxID_ANY),
@@ -95,9 +111,11 @@ void ChatPanel::setup_layout() noexcept {
         wxButton(this, wxID_ANY, wxString::FromUTF8("📤 Send"), wxDefaultPosition, wxDefaultSize,
                  wxBU_EXACTFIT | wxBORDER_NONE);
 
-    if (!main_sizer || !m_chat_display_ptr || !m_error_banner_ptr || !m_tray_container_ptr ||
-        !input_control_sizer || !m_attach_button_ptr || !m_prompt_input_ptr || !m_spinner_ptr ||
-        !m_copy_button_ptr || !m_send_button_ptr) [[unlikely]] {
+    if (main_sizer == nullptr || m_chat_display_ptr == nullptr || m_error_banner_ptr == nullptr ||
+        m_tray_container_ptr == nullptr || input_control_sizer == nullptr ||
+        m_attach_button_ptr == nullptr || m_prompt_input_ptr == nullptr ||
+        m_spinner_ptr == nullptr || m_copy_button_ptr == nullptr || m_send_button_ptr == nullptr)
+        [[unlikely]] {
         return;
     }
 
@@ -142,7 +160,6 @@ void ChatPanel::bind_events() noexcept {
     m_copy_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_copy_action, this);
     m_prompt_input_ptr->Bind(wxEVT_KEY_DOWN, &ChatPanel::on_prompt_key_down, this);
     m_chat_display_ptr->Bind(wxEVT_HTML_LINK_CLICKED, &ChatPanel::on_link_clicked, this);
-
     m_spinner_ptr->Bind(wxEVT_LEFT_DOWN, &ChatPanel::on_spinner_mouse_down, this);
 }
 
@@ -161,8 +178,9 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     m_error_banner_ptr->HideAlert();
 
     const wxString support_wildcard =
-        "All Support Formats|"
-        "*.txt;*.cpp;*.hpp;*.py;*.json;*.log;*.pdf;*.png;*.jpg;*.jpeg";
+        "All Supported Assets|"
+        "*.txt;*.cpp;*.hpp;*.py;*.json;*.log;*.pdf;*.png;*.jpg;*.jpeg;*.webp;"
+        "*.docx;*.odt;*.xlsx;*.ods;*.xml;*.epub";
 
     wxFileDialog file_dialog(this, "Select File Assets for Ingestion", "", "", support_wildcard,
                              wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE);
@@ -178,11 +196,19 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
         std::string target_path = selected_paths[index].ToStdString();
         auto result = m_attachment_engine->AnalyzeAndAdd(target_path);
 
-        if (!result) {
+        // FIXED: Remapped expected outcome evaluation vectors to eliminate standard token negation
+        if (!result.has_value()) {
             switch (result.error()) {
                 case engine::storage::IngestionError::IMAGE_TOO_LARGE: {
                     m_error_banner_ptr->ShowAlert(
                         "File limit crossed: Vision targets must be under 4MB to protect VRAM.",
+                        BannerState::ERROR);
+                    break;
+                }
+                // FIXED: Integrated semantic branch handling the expanded PDF threshold failures
+                case engine::storage::IngestionError::DOCUMENT_TOO_LARGE: {
+                    m_error_banner_ptr->ShowAlert(
+                        "File limit crossed: Large document targets must be under 4MB.",
                         BannerState::ERROR);
                     break;
                 }
@@ -195,6 +221,18 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
                 case engine::storage::IngestionError::CONTEXT_OVERFLOW: {
                     m_error_banner_ptr->ShowAlert("Context window limit overflow threat detected.",
                                                   BannerState::WARNING);
+                    break;
+                }
+                case engine::storage::IngestionError::PARSING_FAILED: {
+                    m_error_banner_ptr->ShowAlert(
+                        "Parsing Failure: File format layout is unreadable or corrupted.",
+                        BannerState::ERROR);
+                    break;
+                }
+                case engine::storage::IngestionError::MAX_LIMIT_REACHED: {
+                    m_error_banner_ptr->ShowAlert(
+                        "Queue Overflow: A maximum of 6 active assets can be loaded concurrently.",
+                        BannerState::WARNING);
                     break;
                 }
             }
@@ -214,7 +252,8 @@ void ChatPanel::refresh_attachment_tray() noexcept {
         return;
     }
 
-    for (const auto &info : attachments) {
+    for (std::size_t index = 0UZ; index < attachments.size(); ++index) {
+        const auto &info = attachments[index];
         auto *chip = new (std::nothrow) wxPanel(m_tray_container_ptr, wxID_ANY, wxDefaultPosition,
                                                 wxDefaultSize, wxBORDER_SIMPLE);
         auto *chip_sizer = new (std::nothrow) wxBoxSizer(wxHORIZONTAL);
@@ -225,7 +264,29 @@ void ChatPanel::refresh_attachment_tray() noexcept {
             wxStaticText(chip, wxID_ANY, wxString::FromUTF8(prefix + info.m_file_name));
         label->SetForegroundColour(wxColour("#F5F5F7"));
 
+        auto *close_button =
+            new (std::nothrow) wxButton(chip, wxID_ANY, wxString::FromUTF8("❌"), wxDefaultPosition,
+                                        wxDefaultSize, wxBU_EXACTFIT | wxBORDER_NONE);
+        close_button->SetBackgroundColour(wxColour("#420912"));
+        close_button->SetForegroundColour(wxColour("#F5F5F7"));
+        close_button->SetCursor(wxCursor(wxCURSOR_HAND));
+        close_button->SetToolTip("Forcibly drop this asset signature from current prompt queue");
+
+        close_button->Bind(wxEVT_BUTTON, [this, index](wxCommandEvent &) {
+            m_attachment_engine->RemoveByIndex(index);
+            refresh_attachment_tray();
+        });
+
+        // FIXED: Broken configuration verification branches mapped safely across layout lines
+        if (chip == nullptr || chip_sizer == nullptr || label == nullptr || close_button == nullptr)
+            [[unlikely]] {
+            continue;
+        }
+
         chip_sizer->Add(label, 0, wxALIGN_CENTER_VERTICAL | wxALL, control_element_padding);
+        chip_sizer->Add(close_button, 0, wxALIGN_CENTER_VERTICAL | wxRIGHT | wxTOP | wxBOTTOM,
+                        control_element_padding);
+
         chip->SetSizer(chip_sizer);
         chip->SetBackgroundColour(wxColour("#420912"));
 
@@ -249,9 +310,14 @@ void ChatPanel::on_send_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 
     for (const auto &file_info : m_attachment_engine->GetPendingAttachments()) {
         if (file_info.m_type == engine::storage::AttachmentType::TEXT_DOCUMENT) {
-            auto text_extraction = m_attachment_engine->ExtractTextContent(file_info);
-            if (text_extraction) {
+            auto text_extraction =
+                malama::engine::storage::AttachmentManager::ExtractTextContent(file_info);
+            if (text_extraction.has_value()) {
                 final_processed_prompt += text_extraction.value();
+            } else {
+                m_error_banner_ptr->ShowAlert(
+                    std::format("Failed to parse document content from: {}", file_info.m_file_name),
+                    BannerState::ERROR);
             }
         } else if (file_info.m_type == engine::storage::AttachmentType::IMAGE) {
             image_layout_indicators +=
@@ -259,12 +325,13 @@ void ChatPanel::on_send_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 
             wxFile image_file(file_info.m_file_path, wxFile::read);
             if (image_file.IsOpened()) {
-                const std::size_t file_length = image_file.Length();
+                const auto file_length = static_cast<std::size_t>(image_file.Length());
+
                 std::vector<char> byte_buffer(file_length);
                 image_file.Read(byte_buffer.data(), byte_buffer.size());
 
-                std::string raw_binary_string(byte_buffer.begin(), byte_buffer.end());
-                base64_images.push_back(malama::network::encode_base64(raw_binary_string));
+                std::string_view zero_copy_view(byte_buffer.data(), byte_buffer.size());
+                base64_images.push_back(malama::network::encode_base64(zero_copy_view));
             }
         }
     }
@@ -306,8 +373,6 @@ void ChatPanel::render_chat_stream() noexcept {
         theme.m_bg_color, theme.m_text_primary, html_body);
 
     m_chat_display_ptr->SetPage(wxString::FromUTF8(complete_html.data(), complete_html.size()));
-
-    // Auto scrolls to capture fresh generation tokens dynamically
     scroll_to_bottom();
 }
 
@@ -325,9 +390,11 @@ void ChatPanel::append_user_message(std::string_view message) noexcept {
 
     std::string lookahead_match = std::string(message);
 
-    if (m_raw_markdown_history.find(lookahead_match) != std::string::npos) {
+    if (m_last_processed_prompt == lookahead_match ||
+        m_last_processed_prompt.starts_with(lookahead_match)) {
         return;
     }
+    m_last_processed_prompt = lookahead_match;
 
     m_raw_markdown_history += "\n\n### 👤 User\n" + lookahead_match + "\n\n### 🤖 malama\n";
     render_chat_stream();
@@ -337,10 +404,12 @@ void ChatPanel::load_history(const core::ChatSession &session) noexcept {
     m_raw_markdown_history = "### System Channel\n`malama v0.2.7-multimodal` synchronized.\n\n---";
     m_active_response_stream.clear();
     m_last_llm_response.clear();
+    m_last_processed_prompt.clear();
 
     for (const auto &message : session.m_messages) {
         if (message.m_role == core::MessageRole::User) {
             m_raw_markdown_history += "\n\n### 👤 User\n" + message.m_content;
+            m_last_processed_prompt = message.m_content;
         } else if (message.m_role == core::MessageRole::Assistant) {
             m_raw_markdown_history += "\n\n### 🤖 malama\n" + message.m_content + "\n\n---";
             m_last_llm_response = message.m_content;
@@ -349,8 +418,6 @@ void ChatPanel::load_history(const core::ChatSession &session) noexcept {
         }
     }
     render_chat_stream();
-
-    // Position the layout engine directly onto the recent dialogue frames at bottom
     scroll_to_bottom();
 }
 
@@ -369,6 +436,7 @@ void ChatPanel::on_prompt_key_down(wxKeyEvent &event) noexcept {
 
 void ChatPanel::on_copy_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     if (wxTheClipboard->Open()) {
+        wxTheClipboard->Clear();
         std::string target_text =
             m_active_response_stream.empty() ? m_last_llm_response : m_active_response_stream;
 
@@ -386,36 +454,14 @@ void ChatPanel::on_copy_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     }
 }
 
-// Add these helper definitions or declare them as private methods in chat_panel.hpp
-inline constexpr int hex_base_system = 16;
-inline constexpr int nibble_bit_shift = 4;
-inline constexpr int alphabet_ascii_offset = 10;
-
-[[nodiscard]] auto decode_hex_payload(std::string_view hex_payload) -> std::string {
-    std::string decoded_string;
-    decoded_string.reserve(hex_payload.size() / 2UZ);
-
-    for (std::size_t index = 0; index + 1 < hex_payload.size(); index += 2) {
-        char high_character = hex_payload[index];
-        char low_character = hex_payload[index + 1];
-
-        int high_value = (high_character >= 'A') ? (high_character - 'A' + alphabet_ascii_offset)
-                                                 : (high_character - '0');
-
-        int low_value = (low_character >= 'A') ? (low_character - 'A' + alphabet_ascii_offset)
-                                               : (low_character - '0');
-
-        decoded_string.push_back(static_cast<char>((high_value << nibble_bit_shift) | low_value));
-    }
-    return decoded_string;
-}
-
 void ChatPanel::handle_code_copy(std::string_view hex_payload) noexcept {
     const std::string raw_code = decode_hex_payload(hex_payload);
 
     if (!wxTheClipboard->Open()) {
         return;
     }
+
+    wxTheClipboard->Clear();
 
     auto *data_obj =
         new (std::nothrow) wxTextDataObject(wxString::FromUTF8(raw_code.data(), raw_code.size()));
@@ -450,23 +496,6 @@ void ChatPanel::handle_code_download(std::string_view hex_payload) noexcept {
     }
 }
 
-void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
-    const wxString href = event.GetLinkInfo().GetHref();
-
-    constexpr std::size_t copy_prefix_length = 19UZ;
-    constexpr std::size_t download_prefix_length = 23UZ;
-
-    if (href.StartsWith("malama://copy_code:")) {
-        const wxString hex_part = href.Mid(copy_prefix_length);
-        handle_code_copy(hex_part.ToStdString());
-    } else if (href.StartsWith("malama://download_code:")) {
-        const wxString hex_part = href.Mid(download_prefix_length);
-        handle_code_download(hex_part.ToStdString());
-    } else {
-        event.Skip();
-    }
-}
-
 void ChatPanel::start_spinner() noexcept {
     if (m_spinner_ptr != nullptr) {
         m_spinner_ptr->Show();
@@ -481,6 +510,23 @@ void ChatPanel::stop_spinner() noexcept {
         m_spinner_ptr->Hide();
     }
     Layout();
+}
+
+void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
+    const wxString link_href = event.GetLinkInfo().GetHref();
+
+    constexpr std::size_t copy_prefix_len = 19UZ;
+    constexpr std::size_t down_prefix_len = 23UZ;
+
+    if (link_href.StartsWith("malama://copy_code:")) {
+        const wxString hex_segment = link_href.Mid(copy_prefix_len);
+        handle_code_copy(hex_segment.ToStdString());
+    } else if (link_href.StartsWith("malama://download_code:")) {
+        const wxString hex_segment = link_href.Mid(down_prefix_len);
+        handle_code_download(hex_segment.ToStdString());
+    } else {
+        event.Skip();
+    }
 }
 
 }  // namespace malama::ui

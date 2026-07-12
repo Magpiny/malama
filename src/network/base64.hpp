@@ -9,6 +9,8 @@
 
 #pragma once
 
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <mutex>
 #include <string>
 #include <string_view>

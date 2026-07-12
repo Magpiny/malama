@@ -18,13 +18,13 @@ namespace malama::network {
 
 // Structure mapping the standard chunk response payload from /api/generate
 struct OllamaGenerateChunk final {
-    std::string response{};
-    bool done{false};
+    std::string m_response;
+    bool m_done{false};
 
     // Glaze compile-time reflection registration interface
     struct glaze {
         using T = OllamaGenerateChunk;
-        static constexpr auto value = glz::object("response", &T::response, "done", &T::done);
+        static constexpr auto value = glz::object("response", &T::m_response, "done", &T::m_done);
     };
 };
 
