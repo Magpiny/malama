@@ -1,8 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
-// Name:        src/ui/chat_panel.hpp
-// Purpose:     Interactive dialogue workspace panel definition
-// Author:      Wanjare S. <samuelwanjare@protonmail.com>
-// Created:     2026-06-12
+// Name:        include/ui/chat_panel.hpp
+// Purpose:     Composite multimodal prompt workspace and message canvas layout
+// Author:      Wanjare <wanjare@magpiny.dev>
+// Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
@@ -11,6 +11,7 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <memory>
 #include <string>
 #include <string_view>
 #include <wx/activityindicator.h>
@@ -20,6 +21,10 @@
 #include <wx/textctrl.h>
 
 #include "core/models.hpp"
+#include "engine/storage/attachment_manager.hpp"
+#include "ui/error_banner.hpp"
+
+class wxBoxSizer;
 
 namespace malama::ui {
 
@@ -48,15 +53,25 @@ class ChatPanel final : public wxPanel {
     void setup_layout() noexcept;
     void bind_events() noexcept;
     void render_chat_stream() noexcept;
+    void refresh_attachment_tray() noexcept;
 
     void on_send_action(wxCommandEvent &event) noexcept;
+    void on_attach_action(wxCommandEvent &event) noexcept;
     void on_copy_action(wxCommandEvent &event) noexcept;
     void on_link_clicked(wxHtmlLinkEvent &event) noexcept;
     void on_prompt_key_down(wxKeyEvent &event) noexcept;
     void on_spinner_mouse_down(wxMouseEvent &event) noexcept;
 
+    void scroll_to_bottom() noexcept;
+    static void handle_code_copy(std::string_view hex_payload) noexcept;
+    void handle_code_download(std::string_view hex_payload) noexcept;
+
     wxHtmlWindow *m_chat_display_ptr{nullptr};
+    ErrorBanner *m_error_banner_ptr{nullptr};
+    wxBoxSizer *m_tray_sizer_ptr{nullptr};
+    wxPanel *m_tray_container_ptr{nullptr};
     wxTextCtrl *m_prompt_input_ptr{nullptr};
+    wxButton *m_attach_button_ptr{nullptr};
     wxButton *m_send_button_ptr{nullptr};
     wxButton *m_copy_button_ptr{nullptr};
     wxActivityIndicator *m_spinner_ptr{nullptr};
@@ -64,6 +79,9 @@ class ChatPanel final : public wxPanel {
     std::string m_raw_markdown_history;
     std::string m_active_response_stream;
     std::string m_last_llm_response;
+    std::string m_last_processed_prompt;
+
+    std::unique_ptr<engine::storage::AttachmentManager> m_attachment_engine;
 };
 
 }  // namespace malama::ui

@@ -1,15 +1,13 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/stream_worker.hpp
-// Purpose:     Asynchronous stream coordinator handling chunk fragmentation
+// Purpose:     Asynchronous Cobalt stream coordinator handling lines
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-11
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-// SPDX-License-Identifier: Apache-2.0
 
 #include <functional>
 #include <memory>
@@ -37,12 +35,9 @@ class StreamWorker final {
                               std::function<void(std::string_view, bool)> token_callback) noexcept
         -> void;
 
-    auto IngestRawNetworkBytes(std::string_view incoming_bytes) noexcept -> void;
-
    private:
     std::unique_ptr<OllamaClient> m_client_ptr;
     std::function<void(std::string_view, bool)> m_token_callback;
-    std::string m_residual_buffer{};
 };
 
 }  // namespace malama::network

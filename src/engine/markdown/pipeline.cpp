@@ -1,6 +1,8 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/engine/markdown/pipeline.cpp
-// Purpose:     Decoupled zero-allocation markdown pipeline with safe std::array
+// Purpose:     Markdown-to-HTML rendering pipeline with a bounded fragment
+//              cache to avoid re-running regex-heavy decoration work on
+//              historical tokens that have not changed since their last render.
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-01
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
@@ -14,15 +16,18 @@
 #include <algorithm>
 #include <array>
 #include <boost/regex.hpp>
-#include <boost/spirit/home/x3.hpp>
+#include <cctype>
+#include <cstdint>
+#include <list>
+#include <mutex>
+#include <optional>
 #include <ranges>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace malama::engine::markdown {
-
-namespace x3 = boost::spirit::x3;
 
 namespace local_constants {
 constexpr size_t hex_buffer_reserve_scale = 2;
@@ -31,6 +36,7 @@ constexpr char hex_mask_lower_nibble = 0x0F;
 constexpr size_t step_past_delimiter = 1;
 constexpr size_t structural_zero_index = 0;
 constexpr size_t minimum_valid_table_rows = 2;
+constexpr size_t minimum_divider_length = 3;
 
 constexpr std::string_view break_line_marker = "<br>";
 constexpr std::string_view spaces_accumulation = " ";
@@ -41,8 +47,158 @@ constexpr std::string_view unordered_list_tag = "ul";
 constexpr std::string_view ordered_list_tag = "ol";
 constexpr std::string_view header_1_size = "+2";
 constexpr std::string_view header_2_size = "+1";
-constexpr std::string_view header_3_size;
+constexpr std::string_view header_3_size{};
+constexpr std::string_view header_4_size{};
+
+constexpr std::string_view fence_tag = "```";
+constexpr std::string_view head_4_tag = "#### ";
+constexpr std::string_view head_3_tag = "### ";
+constexpr std::string_view head_2_tag = "## ";
+constexpr std::string_view head_1_tag = "# ";
+constexpr std::string_view list_star_tag = "* ";
+constexpr std::string_view list_dash_tag = "- ";
 }  // namespace local_constants
+
+namespace {
+
+// ---------------------------------------------------------------------------
+// Fragment cache: keyed by a hash of (token content + language + active
+// theme), storing the already-decorated HTML for that exact input. This is a
+// translation-unit-local detail -- Pipeline's public interface in the header
+// is untouched. It exists because decorate_inline_text/decorate_code_block
+// are regex-heavy, and chat_panel.cpp re-runs the whole markdown pipeline
+// over the full conversation history on every render; without this cache,
+// every historical header/paragraph/code-block gets fully re-decorated on
+// every token, which is the dominant cost in long conversations.
+//
+// Bounded to `max_entries` with simple LRU eviction so memory use cannot grow
+// without limit over a long-running session -- consistent with the low
+// memory footprint goal for this project.
+class FragmentCache {
+   public:
+    static constexpr std::size_t max_entries = 512;
+
+    [[nodiscard]] auto get(std::size_t key) -> std::optional<std::string> {
+        const std::scoped_lock lock(m_mutex);
+        auto entry_it = m_map.find(key);
+        if (entry_it == m_map.end()) {
+            return std::nullopt;
+        }
+        touch(entry_it->second.m_order_it, key);
+        return entry_it->second.m_html;
+    }
+
+    void put(std::size_t key, std::string html) {
+        const std::scoped_lock lock(m_mutex);
+        if (m_map.contains(key)) {
+            return;
+        }
+        if (m_map.size() >= max_entries) {
+            evict_oldest();
+        }
+        m_order.push_back(key);
+        m_map.emplace(key, Entry{std::move(html), std::prev(m_order.end())});
+    }
+
+   private:
+    struct Entry {
+        std::string m_html;
+        std::list<std::size_t>::iterator m_order_it;
+    };
+
+    void touch(std::list<std::size_t>::iterator &order_it, std::size_t key) {
+        m_order.erase(order_it);
+        m_order.push_back(key);
+        order_it = std::prev(m_order.end());
+    }
+
+    void evict_oldest() {
+        if (m_order.empty()) {
+            return;
+        }
+        const std::size_t oldest_key = m_order.front();
+        m_order.pop_front();
+        m_map.erase(oldest_key);
+    }
+
+    std::unordered_map<std::size_t, Entry> m_map;
+    std::list<std::size_t> m_order;
+    std::mutex m_mutex;
+};
+
+[[nodiscard]] auto inline_text_cache() -> FragmentCache & {
+    static FragmentCache cache;
+    return cache;
+}
+
+[[nodiscard]] auto code_block_cache() -> FragmentCache & {
+    static FragmentCache cache;
+    return cache;
+}
+
+inline constexpr std::size_t fnv_offset_basis = 14695981039346656037ULL;
+inline constexpr std::size_t fnv_prime = 1099511628211ULL;
+
+// FNV-1a. Fast, deterministic, adequate as a cache key -- not used for any
+// security-sensitive purpose, so no cryptographic hash is needed here.
+[[nodiscard]] auto hash_with_seed(std::string_view text, std::size_t seed) noexcept -> std::size_t {
+    std::size_t hash_value = seed;
+    for (const char byte_char : text) {
+        const auto byte_value = static_cast<unsigned char>(byte_char);
+        hash_value ^= byte_value;
+        hash_value *= fnv_prime;
+    }
+    return hash_value;
+}
+
+// Cheap fingerprint of the theme fields that actually affect decoration
+// output, used so a theme switch correctly invalidates cached fragments
+// instead of serving stale colors.
+[[nodiscard]] auto theme_fingerprint(const config::AppearanceConfig &theme) -> std::string {
+    std::string fingerprint;
+    fingerprint += theme.m_code_string;
+    fingerprint += '\x1f';
+    fingerprint += theme.m_code_comment;
+    fingerprint += '\x1f';
+    fingerprint += theme.m_code_keyword;
+    fingerprint += '\x1f';
+    fingerprint += theme.m_code_bg;
+    fingerprint += '\x1f';
+    fingerprint += theme.m_text_primary;
+    return fingerprint;
+}
+
+[[nodiscard]] auto is_divider_line(std::string_view line) noexcept -> bool {
+    // CommonMark requires a thematic break to consist ONLY of the marker
+    // character (plus optional spaces, which chat content won't have here).
+    // The previous x3::lit("---") check matched as soon as it saw the first
+    // three dashes and silently discarded whatever followed on the same
+    // line -- e.g. "---not actually a divider" lost everything after the
+    // dashes. Requiring the whole line to be dashes fixes that data loss.
+    if (line.size() < local_constants::minimum_divider_length) {
+        return false;
+    }
+    return std::ranges::all_of(line, [](char character) { return character == '-'; });
+}
+
+[[nodiscard]] auto is_ordered_list_line(std::string_view line, std::size_t &prefix_length) noexcept
+    -> bool {
+    std::size_t digit_count = 0;
+    while (digit_count < line.size() &&
+           (std::isdigit(static_cast<unsigned char>(line[digit_count])) != 0)) {
+        ++digit_count;
+    }
+    if (digit_count == 0 || line.size() < digit_count + 2) {
+        return false;
+    }
+    if (line[digit_count] != '.' || line[digit_count + 1] != ' ') {
+        return false;
+    }
+    prefix_length = digit_count + 2;
+    return true;
+}
+
+}  // namespace
 
 Pipeline::Pipeline(config::AppearanceConfig theme) noexcept : m_theme(std::move(theme)) {}
 
@@ -61,9 +217,9 @@ struct TokenizerState {
         if (!m_buffer.empty()) {
             Token token;
             token.m_type = type;
-            token.m_content = m_buffer;
-            token.m_language = m_language;
-            m_tokens.push_back(token);
+            token.m_content = std::move(m_buffer);
+            token.m_language = std::move(m_language);
+            m_tokens.push_back(std::move(token));
             m_buffer.clear();
             m_language.clear();
         }
@@ -71,38 +227,35 @@ struct TokenizerState {
 };
 
 static void parse_markdown_elements(std::string_view line_view, TokenizerState &state) {
-    auto head_3_tag = x3::lit("### ");
-    auto head_2_tag = x3::lit("## ");
-    auto head_1_tag = x3::lit("# ");
-    auto divider_tag = x3::lit("---");
-    auto list_un_tag = x3::lit("* ") | x3::lit("- ");
-    auto list_or_tag = x3::lexeme[+x3::digit >> x3::lit(". ")];
+    std::size_t ordered_prefix_length = 0;
 
-    const auto *line_start = line_view.cbegin();
-    const auto *line_final = line_view.cend();
-
-    if (x3::parse(line_start, line_final, head_3_tag)) {
+    if (line_view.starts_with(local_constants::head_4_tag)) {
         state.push_buffer(token_type::paragraph);
-        state.m_buffer = std::string(line_start, line_final);
+        state.m_buffer = std::string(line_view.substr(local_constants::head_4_tag.size()));
+        state.push_buffer(token_type::header_4);
+    } else if (line_view.starts_with(local_constants::head_3_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_view.substr(local_constants::head_3_tag.size()));
         state.push_buffer(token_type::header_3);
-    } else if (x3::parse(line_start, line_final, head_2_tag)) {
+    } else if (line_view.starts_with(local_constants::head_2_tag)) {
         state.push_buffer(token_type::paragraph);
-        state.m_buffer = std::string(line_start, line_final);
+        state.m_buffer = std::string(line_view.substr(local_constants::head_2_tag.size()));
         state.push_buffer(token_type::header_2);
-    } else if (x3::parse(line_start, line_final, head_1_tag)) {
+    } else if (line_view.starts_with(local_constants::head_1_tag)) {
         state.push_buffer(token_type::paragraph);
-        state.m_buffer = std::string(line_start, line_final);
+        state.m_buffer = std::string(line_view.substr(local_constants::head_1_tag.size()));
         state.push_buffer(token_type::header_1);
-    } else if (x3::parse(line_start, line_final, divider_tag)) {
+    } else if (is_divider_line(line_view)) {
         state.push_buffer(token_type::paragraph);
         state.push_buffer(token_type::divider);
-    } else if (x3::parse(line_start, line_final, list_un_tag)) {
+    } else if (line_view.starts_with(local_constants::list_star_tag) ||
+               line_view.starts_with(local_constants::list_dash_tag)) {
         state.push_buffer(token_type::paragraph);
-        state.m_buffer = std::string(line_start, line_final);
+        state.m_buffer = std::string(line_view.substr(local_constants::list_star_tag.size()));
         state.push_buffer(token_type::list_unordered);
-    } else if (x3::parse(line_start, line_final, list_or_tag)) {
+    } else if (is_ordered_list_line(line_view, ordered_prefix_length)) {
         state.push_buffer(token_type::paragraph);
-        state.m_buffer = std::string(line_start, line_final);
+        state.m_buffer = std::string(line_view.substr(ordered_prefix_length));
         state.push_buffer(token_type::list_ordered);
     } else {
         if (!line_view.empty() && line_view.front() == '|') {
@@ -114,31 +267,28 @@ static void parse_markdown_elements(std::string_view line_view, TokenizerState &
         } else if (line_view.empty()) {
             state.m_buffer += local_constants::break_line_marker;
         } else {
-            state.m_buffer +=
-                std::string(line_view) + std::string(local_constants::spaces_accumulation);
+            state.m_buffer += std::string(line_view);
+            state.m_buffer += local_constants::spaces_accumulation;
         }
     }
 }
 
 static void evaluate_line_tokens(std::string_view line_view, TokenizerState &state) {
-    auto block_tag = x3::lit("```");
-    const auto *line_start = line_view.cbegin();
-    const auto *line_final = line_view.cend();
-
-    if (x3::parse(line_start, line_final, block_tag)) {
+    if (line_view.starts_with(local_constants::fence_tag)) {
         if (state.m_in_block) {
             state.push_buffer(token_type::code_block);
             state.m_in_block = false;
         } else {
             state.push_buffer(token_type::paragraph);
             state.m_in_block = true;
-            state.m_language = std::string(line_start, line_final);
+            state.m_language = std::string(line_view.substr(local_constants::fence_tag.size()));
         }
         return;
     }
 
     if (state.m_in_block) {
-        state.m_buffer += std::string(line_view) + "\n";
+        state.m_buffer += std::string(line_view);
+        state.m_buffer += "\n";
         return;
     }
 
@@ -177,6 +327,14 @@ auto Pipeline::tokenize(std::string_view text_content) -> std::vector<Token> {
 }
 
 auto Pipeline::decorate_inline_text(std::string_view text_content) const -> std::string {
+    const std::string fingerprint = theme_fingerprint(m_theme);
+    const std::size_t cache_key =
+        hash_with_seed(text_content, hash_with_seed(fingerprint, fnv_offset_basis));
+
+    if (auto cached = inline_text_cache().get(cache_key)) {
+        return std::move(*cached);
+    }
+
     static const boost::regex bold_pattern(R"(\*\*(.*?)\*\*)");
     static const boost::regex code_pattern(R"(`(.*?)`)");
 
@@ -186,11 +344,22 @@ auto Pipeline::decorate_inline_text(std::string_view text_content) const -> std:
     std::string inline_code_tag =
         "<font color=\"" + m_theme.m_code_string + R"(" face="monospace">$1</font>)";
     processed = boost::regex_replace(processed, code_pattern, inline_code_tag);
+
+    inline_text_cache().put(cache_key, processed);
     return processed;
 }
 
 auto Pipeline::decorate_code_block(std::string_view code, const std::string &lang) const
     -> std::string {
+    const std::string fingerprint = theme_fingerprint(m_theme);
+    std::size_t cache_key = hash_with_seed(code, fnv_offset_basis);
+    cache_key = hash_with_seed(lang, cache_key);
+    cache_key = hash_with_seed(fingerprint, cache_key);
+
+    if (auto cached = code_block_cache().get(cache_key)) {
+        return std::move(*cached);
+    }
+
     static const boost::regex entity_amp("&");
     static const boost::regex entity_lt("<");
     static const boost::regex entity_gt(">");
@@ -233,7 +402,6 @@ auto Pipeline::decorate_code_block(std::string_view code, const std::string &lan
             for (size_t rule_idx = 0; rule_idx < syntax->m_rules.size(); ++rule_idx) {
                 boost::smatch match_results;
 
-                // Fixes Issue 5: Uses explicit static cast to avoid narrowing conversion warnings
                 auto start_offset = static_cast<std::ptrdiff_t>(current_pos);
                 auto start_iter = std::next(processed.cbegin(), start_offset);
                 auto final_iter = processed.cend();
@@ -241,8 +409,10 @@ auto Pipeline::decorate_code_block(std::string_view code, const std::string &lan
                 const auto &rule_ref = syntax->m_rules[rule_idx];
                 if (boost::regex_search(start_iter, final_iter, match_results,
                                         rule_ref.m_compiled_pattern)) {
-                    size_t match_start = current_pos + match_results.position();
-                    size_t match_final = match_start + match_results.length();
+                    const std::size_t match_start =
+                        current_pos + static_cast<std::size_t>(match_results.position());
+                    const std::size_t match_final =
+                        match_start + static_cast<std::size_t>(match_results.length());
                     if (match_start < best_start) {
                         best_start = match_start;
                         best_final = match_final;
@@ -321,6 +491,8 @@ auto Pipeline::decorate_code_block(std::string_view code, const std::string &lan
     html_output += m_theme.m_text_primary;
     html_output += R"(" face="monospace">)";
     html_output += processed + "</font>" + actions_html + "</td></tr></table><br>";
+
+    code_block_cache().put(cache_key, html_output);
     return html_output;
 }
 
@@ -395,12 +567,16 @@ void emit_rendered_cells(std::string &html_output, const std::vector<std::string
         trimmed.erase(std::ranges::find_if_not(std::views::reverse(trimmed), is_space).base(),
                       trimmed.end());
 
+        // Fixed: the previous version had a stray space inside the quotes
+        // (e.g. bgcolor=" #1a0105 "), which wxHtmlWindow's attribute parser
+        // does not tolerate for hex colors -- it silently fell back to the
+        // default color instead of applying the theme.
         if (row_idx == 0) {
-            html_output += R"(<th bgcolor=" )" + theme.m_surface_color + R"( "><b><font color=" )" +
-                           theme.m_text_accent + R"( ">)" + decorator(trimmed) +
+            html_output += R"(<th bgcolor=")" + theme.m_surface_color + R"("><b><font color=")" +
+                           theme.m_text_accent + R"(">)" + decorator(trimmed) +
                            R"(</font></b></th>)";
         } else {
-            html_output += R"(<td><font color=" )" + theme.m_text_primary + R"( ">)" +
+            html_output += R"(<td><font color=")" + theme.m_text_primary + R"(">)" +
                            decorator(trimmed) + R"(</font></td>)";
         }
     }
@@ -500,6 +676,10 @@ auto Pipeline::emit(const std::vector<Token> &tokens) const -> std::string {
             case token_type::header_3:
                 handle_header(token_ref, html_output, local_constants::header_3_size);
                 break;
+            case token_type::header_4:
+                handle_header(token_ref, html_output, local_constants::header_4_size);
+                break;
+
             case token_type::divider:
                 handle_divider(html_output);
                 break;

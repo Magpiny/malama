@@ -9,6 +9,8 @@
 
 #pragma once
 
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 #include <vector>
 #include <wx/event.h>
 #include <wx/stattext.h>
@@ -46,10 +48,12 @@ class SidebarPanel final : public wxPanel {
     void setup_layout() noexcept;
     void bind_events() noexcept;
 
-    void on_session_selected(wxCommandEvent &WXUNUSED(event)) noexcept;
-    // void on_context_menu(wxCommandEvent &WXUNUSED(event)) noexcept;
-    void on_context_menu(wxContextMenuEvent &WXUNUSED(event)) noexcept;
-    void on_new_chat_click(wxCommandEvent &WXUNUSED(event)) noexcept;
+    void on_session_selected(wxCommandEvent &custom_event) noexcept;
+    void on_context_menu(wxContextMenuEvent &context_event) noexcept;
+    void on_new_chat_click(wxCommandEvent &button_event) noexcept;
+
+    // Appended coordinate tracking listener declaration signature
+    void on_history_mouse_motion(wxMouseEvent &mouse_event) noexcept;
 
     wxButton *m_new_chat_btn_ptr{nullptr};
     wxListBox *m_history_list_ptr{nullptr};

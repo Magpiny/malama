@@ -36,7 +36,8 @@ auto HistoryManager::GenerateUuidString() -> std::string {
 
 auto HistoryManager::GetCurrentEpoch() -> uint64_t {
     auto time_point = std::chrono::system_clock::now().time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::seconds>(time_point).count();
+    return static_cast<std::uint64_t>(
+        std::chrono::duration_cast<std::chrono::seconds>(time_point).count());
 }
 
 auto HistoryManager::InitializeDatabase() noexcept -> bool {

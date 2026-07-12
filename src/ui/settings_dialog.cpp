@@ -287,10 +287,10 @@ auto SettingsDialog::populate_data() noexcept -> void {
         m_status_label_ptr->SetForegroundColour(wxColour(100, 220, 100));
 
         int selected_index = 0;
-        for (int index = 0; index < static_cast<int>(available_models.size()); ++index) {
+        for (std::size_t index = 0UZ; index < available_models.size(); ++index) {
             m_model_choice_ptr->Append(wxString::FromUTF8(available_models[index]));
             if (available_models[index] == m_local_config.m_engine.m_active_model) {
-                selected_index = index;
+                selected_index = static_cast<int>(index);
             }
         }
         m_model_choice_ptr->SetSelection(selected_index);
@@ -374,7 +374,7 @@ auto SettingsDialog::save_data() noexcept -> void {
     int selection = m_model_choice_ptr->GetSelection();
     if (selection != wxNOT_FOUND) {
         m_local_config.m_engine.m_active_model =
-            m_model_choice_ptr->GetString(selection).ToStdString();
+            m_model_choice_ptr->GetString(static_cast<unsigned int>(selection)).ToStdString();
     }
 
     m_local_config.m_interaction.m_typewriter_delay_ms = m_delay_spin_ptr->GetValue();
@@ -402,7 +402,8 @@ auto SettingsDialog::save_data() noexcept -> void {
     int font_selection = m_font_family_choice_ptr->GetSelection();
     if (font_selection != wxNOT_FOUND) {
         m_local_config.m_appearance.m_font_family =
-            m_font_family_choice_ptr->GetString(font_selection).ToStdString();
+            m_font_family_choice_ptr->GetString(static_cast<unsigned int>(font_selection))
+                .ToStdString();
     }
 
     confmgr.update_config(m_local_config);
@@ -431,7 +432,7 @@ void SettingsDialog::on_refresh_models([[maybe_unused]] wxCommandEvent &event) n
     int selection = m_model_choice_ptr->GetSelection();
     if (selection != wxNOT_FOUND) {
         m_local_config.m_engine.m_active_model =
-            m_model_choice_ptr->GetString(selection).ToStdString();
+            m_model_choice_ptr->GetString(static_cast<unsigned int>(selection)).ToStdString();
     }
     populate_data();
 }

@@ -4,12 +4,12 @@
 // Author:      Wanjare <wanjare@magpiny.dev>
 // Created:     2026-06-09
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3-or-later
 
 #include <glaze/glaze.hpp>
 #include <string>
@@ -18,13 +18,13 @@ namespace malama::network {
 
 // Structure mapping the standard chunk response payload from /api/generate
 struct OllamaGenerateChunk final {
-    std::string response{};
-    bool done{false};
+    std::string m_response;
+    bool m_done{false};
 
     // Glaze compile-time reflection registration interface
     struct glaze {
         using T = OllamaGenerateChunk;
-        static constexpr auto value = glz::object("response", &T::response, "done", &T::done);
+        static constexpr auto value = glz::object("response", &T::m_response, "done", &T::m_done);
     };
 };
 

@@ -4,15 +4,14 @@
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-04
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <cstdint>
 #include <string>
-
-// SPDX-License-Identifier: Apache-2.0
 
 namespace malama::engine::markdown {
 
@@ -21,6 +20,7 @@ enum class token_type : std::uint8_t {
     header_1,
     header_2,
     header_3,
+    header_4,
     divider,
     list_unordered,
     list_ordered,

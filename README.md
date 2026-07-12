@@ -1,166 +1,370 @@
+
 <div align="center">
 
-<img src="./assets/ic_malama.jpeg" alt="Malama" width="120" />
+./assets/ic_malama.jpeg
 
 # Malama
 
-**Native Linux chat client for local LLMs — no cloud, no browser, no compromise.**
+### A native Linux chat client for local LLMs
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](#)
-[![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](#)
-[![wxWidgets](https://img.shields.io/badge/UI-wxWidgets%203.3-green.svg)](#)
-[![Ollama](https://img.shields.io/badge/backend-Ollama-orange.svg)](#)
-[![Version](https://img.shields.io/badge/version-0.2.5-informational.svg)](#)
+**No cloud. No browser. No compromise.**
+
+https://img.shields.io/badge/License-GPLv3-blue.svg](LICENSE)
+https://img.shields.io/badge/C%2B%2B-23-00599C.svg](#build-requirements)
+https://img.shields.io/badge/Platform-Linux-FCC624.svg](#build-requirements)
+https://img.shields.io/badge/UI-wxWidgets%203.3-2F80ED.svg](https://www.wxwidgets.org/)
+https://img.shields.io/badge/Backend-Ollama-orange.svg](https://ollama.com/)
+https://img.shields.io/badge/Version-0.2.7--7-708090.svg](#whats-new-in-v027-7)
+
+<br />
+
+Malama is a lightweight, private, and fully native desktop interface for chatting  
+with large language models running locally through Ollama.
 
 </div>
 
 ---
 
-![Malama v0.2.5 UI](./assets/malama_ui.png)
+<div align="center">
+
+./assets/malama_ui.png
+
+</div>
 
 ---
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [What's New in v0.2.5](#whats-new-in-v025)
-- [Key Features](#key-features)
-- [Architecture](#architecture)
-- [Build Requirements](#build-requirements)
-- [Setup Guide](#setup-guide)
-  - [1. Install Ollama](#1-install-ollama)
-  - [2. Pull a Model](#2-pull-a-model)
-  - [3. Build Malama](#3-build-malama)
-- [Usage](#usage)
+- #overview
+- #why-malama
+- #whats-new-in-v027-7
+- #key-features
+- #supported-attachments
+- #architecture
+  - #ingestion-subsystem
+  - #network-payload-serialization
+  - #memory-and-style-policy
+- #build-requirements
+- #setup-guide
+  - #1-install-ollama
+  - #2-pull-a-model
+  - #3-install-build-dependencies
+  - [4. Clone nd-build-malama
+  - #5-run-malama
+- #usage
+- #privacy
+- #license
 
 ---
 
 ## Overview
 
-**Malama** is a lightweight, native Linux desktop chat client built on wxWidgets and C++23.
-It connects directly to a local [Ollama](https://ollama.com) instance over TCP, delivering
-a full LLM chat workspace that idles at ~20 MB of RAM — with no Electron, no browser engine,
-and no dependency on any external network.
+**Malama** is a lightweight, native Linux desktop chat client built with  
+**C++23** and **wxWidgets**.
+
+It connects directly to a local [Ollama](https://ollama.com/) instance over TCP and
+provides a complete LLM chat workspace without relying on Electron, an embedded
+browser engine, or an external cloud service.
+
+Malama idles at approximately **40 MB of RAM**, leaving more of your system
+resources available for model inference.
+
+> [!IMPORTANT]
+> Malama is designed for local inference. Your conversations and attached
+> documents remain on your machine unless your Ollama configuration or selected
+> model explicitly communicates with an external service.
 
 ---
 
-## What's New in v0.2.5
+## Why Malama?
 
-### Dynamic Model Discovery
-The hardcoded model name field is gone. Malama now queries the local Ollama
-`/api/tags` endpoint at startup over a Boost.Asio TCP socket and populates a
-`wxChoice` selector in the engine settings panel with every model currently
-available on your system. Pull a new model with `ollama pull`, restart Malama,
-and it appears automatically — no config file editing required.
+Many desktop AI clients are browser applications packaged as desktop programs.
+Malama takes a different approach:
 
-### Reasoning Filter
-Extended reasoning models (DeepSeek-R1, QwQ, and others) embed their chain-of-thought
-inside `<think>` blocks that most users never need to read. A new toggle in the
-preferences panel lets you suppress those blocks entirely. The filter runs on a
-thread-isolated state machine so it never stalls streaming delivery.
+- **Native Linux interface** built with wxWidgets
+- **Local-first operation** through Ollama
+- **Low memory usage** with no Electron runtime
+- **Persistent conversations** stored using SQLite
+- **Real-time token streaming** over asynchronous TCP
+- **Document and image attachments**
+- **C++23 architecture** with explicit ownership and error handling
+- **No browser or cloud account required**
 
-### Non-Blocking Service Restarts
-Changing engine parameters (model, context window, temperature) that require an
-Ollama service restart no longer blocks the UI. A detached `std::jthread` handles
-the `systemctl restart` call in the background; the interface stays fully
-responsive throughout.
+---
+
+## What's New in v0.2.7-7
+
+### Multimodal Asset Ingestion
+
+Malama now includes a factory-routed attachment manager capable of processing
+images, documents, spreadsheets, e-books, and plain-text files.
+
+Supported formats include:
+
+```text
+Images:       .png, .jpg, .jpeg, .webp
+Documents:    .pdf, .docx, .odt
+Spreadsheets: .xlsx, .ods
+E-books:      .epub
+Text:         .txt, .md
+```
+
+Files can be attached directly to the active conversation before a prompt is
+submitted.
+
+### Context Isolation Boundaries
+
+Extracted document content is enclosed within explicit Markdown context markers:
+
+```text
+[START OF CONTEXT DOCUMENT: filename]
+Extracted document content
+[END OF CONTEXT DOCUMENT: filename]
+```
+
+These boundaries help the model distinguish user instructions from attached
+reference material.
+
+### Extended Ollama Context Allocation
+
+Ollama commonly uses a smaller default context window. To reduce the likelihood
+of long documents being silently truncated, Malama's asynchronous request
+pipeline explicitly sets:
+
+```json
+{
+  "num_ctx": 32000
+}
+```
+
+> [!NOTE]
+> The effective context capacity still depends on the selected model and the
+> memory available on your system.
+
+### Bounded File Processing
+
+Individual image and PDF attachments are subject to a **4 MB processing limit**.
+
+This boundary helps protect local systems from excessive RAM or VRAM use,
+unexpected allocation failures, and oversized document payloads.
+
+### Attachment Queue Management
+
+Attached files appear in a horizontal staging tray beneath the prompt editor.
+
+Each attachment is represented by a compact chip containing:
+
+- A file-type icon
+- The attachment name
+- An independent remove button
+- Its current staging state
+
+This makes it possible to review and remove individual files before sending the
+prompt.
+
+### Accurate Sidebar Hit Testing
+
+Sidebar interaction now uses localized `HitTest` checks through
+`wxEVT_MOTION`.
+
+Hand cursors and navigation tooltips are displayed only when the pointer is
+positioned over a valid conversation entry, avoiding inaccurate interactions
+caused by broad widget-level bounding boxes.
 
 ---
 
 ## Key Features
 
-| | Feature | Description |
+| Feature | Description |
+|---|---|
+| 🪶 **Minimal Footprint** | Idles at approximately 20 MB of RAM. System resources remain available for model inference instead of an embedded browser runtime. |
+| 🔒 **Local-First Operation** | Connects directly to a local Ollama instance without requiring a cloud account or browser session. |
+| 💾 **Persistent Sessions** | Stores conversation history locally with SQLite3 and supports pinning, renaming, and deleting sessions. |
+| ⚡ **Low-Latency Streaming** | Uses Boost.Asio for asynchronous TCP communication and real-time token delivery. |
+| 🖼️ **Multimodal Routing** | Validates supported images and prepares Base64 payloads for compatible vision-language models. |
+| 📄 **Document Extraction** | Extracts text from documents, spreadsheets, e-books, markup files, and plain-text assets. |
+| ❌ **Selective Queue Control** | Allows individual attachments to be removed before a request is submitted. |
+| 📌 **Precise Sidebar Interaction** | Uses coordinate-aware hit testing for reliable conversation selection and hover behavior. |
+| 📝 **Native Markdown Rendering** | Includes a native Markdown canvas and JSON-configurable syntax highlighting for languages such as C++, Rust, and Python. |
+| 🧠 **Reasoning Filter** | Optionally removes `<think>` blocks produced by reasoning-oriented models through a thread-isolated state machine. |
+| 🧩 **Decoupled Architecture** | Separates interface widgets, networking workers, storage repositories, and file parsers into focused components. |
+
+---
+
+## Supported Attachments
+
+| Category | Formats | Processing Strategy |
 |---|---|---|
-| 🪶 | **Minimal Footprint** | Idles at ~20 MB RAM. No Electron wrapper — hardware resources go to model inference, not the UI layer. |
-| 💾 | **Persistent Sessions** | SQLite3-backed conversation history with pin, rename, and delete support. |
-| 🔁 | **Session Restoration** | Automatically restores your last active conversation on startup. |
-| ⚡ | **Low-Latency Streaming** | Non-blocking TCP streaming via Boost.Asio for real-time token delivery as the model generates. |
-| 📝 | **Native Markdown** | Zero-dependency Markdown renderer with a JSON-pluggable syntax highlighting registry (C++, Rust, Python). |
-| 🔒 | **Completion Hardening** | Completions are committed to disk before deallocation, preventing data loss on abrupt exit. |
-| 🔍 | **Dynamic Model Discovery** | Queries the local Ollama `/api/tags` endpoint at startup; all available models populate a `wxChoice` selector automatically — no config editing. |
-| 🧠 | **Reasoning Filter** | Preferences toggle to strip `<think>` blocks from extended reasoning models (DeepSeek-R1, QwQ, etc.) via a thread-isolated state machine. |
+| Images | PNG, JPEG, JPG, WebP | Validation and Base64 encoding for multimodal models |
+| PDF documents | PDF | Text extraction through `poppler-cpp` |
+| Office documents | DOCX, XLSX | Archive extraction and XML traversal |
+| OpenDocument files | ODT, ODS | Archive extraction and XML traversal |
+| E-books | EPUB | Archive extraction and structured text traversal |
+| Plain text | TXT, MD | Direct UTF-8 text ingestion |
+
+> [!WARNING]
+> Image attachments require a model with vision capabilities. A text-only model
+> cannot interpret image payloads.
 
 ---
 
 ## Architecture
 
-Malama is built around a clean separation between the UI thread, the background stream worker, and the storage layer.
+Malama maintains a clear separation between the user interface, attachment
+processing, asynchronous networking, persistent storage, and the local model
+runtime.
 
-**Storage Engine**
-Parameterized SQLite3 queries protected by transaction guards across thread boundaries.
-All object lifetimes are managed through `std::unique_ptr` — no raw owning pointers anywhere in the codebase.
+```text
+┌──────────────────────────────────────────────────────────┐
+│                    UI Thread / Main Frame                │
+│                                                          │
+│   ┌──────────────────────┐   ┌────────────────────────┐   │
+│   │   ChatPanel Canvas   │   │  SidebarPanel List     │   │
+│   └──────────┬───────────┘   └────────────▲───────────┘   │
+└──────────────┼─────────────────────────────┼───────────────┘
+               │                             │
+        on_send_action()               wxQueueEvent
+               │                       token updates
+               ▼                             │
+┌──────────────────────────┐    ┌────────────┴─────────────┐
+│    AttachmentManager     │    │       StreamWorker       │
+│                          │    │                          │
+│  Factory-routed parsers  │    │  Boost.Asio TCP socket  │
+│  libarchive + pugixml    │    │  Glaze JSON processing  │
+└─────────────┬────────────┘    └────────────┬─────────────┘
+              │                              │
+              └───────────┬──────────────────┘
+                          │
+                  POST /api/chat
+                  num_ctx: 32000
+                          │
+                          ▼
+              ┌────────────────────────┐
+              │ Local Ollama Instance  │
+              └────────────────────────┘
+```
 
-**Stream Worker**
-A background `StreamWorker` thread deserialises raw Ollama JSON responses via the
-[`glaze`](https://github.com/stephenberry/glaze) compile-time reflection layer and
-forwards terminal tokens to `MainFrame` via `wxQueueEvent`, keeping the UI thread
-entirely free of blocking I/O.
+### Ingestion Subsystem
 
-**Model Discovery**
-At startup, a Boost.Asio TCP socket queries `http://127.0.0.1:11434/api/tags` on
-the local loopback. The JSON response is reflected via `glaze` and the resulting
-model list is forwarded to the engine settings panel's `wxChoice` widget on the
-main thread via `wxQueueEvent`. The entire sequence is distribution-agnostic —
-it works regardless of how Ollama was installed.
+The `AttachmentManager` acts as the central entry point for file ingestion.
 
-**Config Bootstrap**
-A thread-safe initialization sequence runs inside the main engine startup path,
-pulling the active Ollama parameters (current model, context size, temperature)
-before the first frame is rendered, so the UI opens already configured.
+When a file enters the application, its extension is classified and routed to
+the appropriate parser through `ParserFactory`.
 
-**Reasoning Filter**
-A thread-isolated state machine in the `StreamWorker` tracks open and close
-`<think>` tags in the token stream and suppresses the enclosed content when the
-filter is enabled in preferences. The state is stored in an `std::atomic<bool>`
-flag so the UI toggle takes effect immediately without restarting the stream.
+#### `PlainTextParser`
 
-**Service Restart Worker**
-When the user changes a parameter that requires an Ollama restart, a detached
-`std::jthread` issues the `systemctl restart ollama` call in the background.
-The UI thread is never blocked; the preferences panel remains interactive throughout.
+Reads UTF-8 text files directly into the reference context.
 
-**Memory Policy**
-Non-throwing allocation (`std::nothrow`) throughout.
-No global mutable state. No raw owning pointers.
+Supported formats include:
 
-**Code Style**
-K&R brace alignment, C++23 throughout.
+```text
+.txt
+.md
+```
+
+#### `PdfParser`
+
+Uses `poppler-cpp` to read text from PDF pages while excluding embedded binary
+content from the resulting prompt context.
+
+#### `XmlParser` and `ArchiveReader`
+
+Processes ZIP-based document formats such as:
+
+```text
+.docx
+.xlsx
+.odt
+.ods
+.epub
+```
+
+`ArchiveReader` uses `libarchive` to inspect and extract archive entries.
+`XmlParser` then traverses relevant XML nodes using `pugixml`.
+
+The extraction process includes boundary checks intended to reduce the risk of
+malformed archives and archive expansion attacks.
+
+#### `ImageParser`
+
+Uses Boost.GIL to inspect image metadata and dimensions.
+
+Format-specific validation is performed through `libpng` and `libjpeg` before
+supported assets are prepared for multimodal requests.
+
+---
+
+### Network Payload Serialization
+
+Extracted text is cached to avoid repeating expensive parsing work.
+
+When a request is submitted:
+
+1. Staged attachments are validated.
+2. Text is extracted from supported documents.
+3. Extracted content is wrapped in context-isolation markers.
+4. Images are encoded into Base64 payloads.
+5. The prompt, attachments, and model options are serialized into JSON.
+6. `num_ctx` is set to `32000`.
+7. The request is streamed to Ollama over a Boost.Asio TCP connection.
+8. Generated tokens are returned to the UI using queued thread-safe events.
+
+---
+
+### Memory and Style Policy
+
+Malama follows a modern C++ ownership and error-handling policy:
+
+- C++23 language features
+- `std::expected` for explicit error propagation
+- No raw owning pointers
+- RAII-managed resources
+- `std::unique_ptr` for exclusive dynamic ownership
+- Non-throwing allocation paths where appropriate
+- Explicit comparisons such as `== false` and `== nullptr`
+- Separation of UI, storage, parsing, and networking responsibilities
 
 ---
 
 ## Build Requirements
 
-Malama targets native Linux only.
+Malama currently targets **native Linux distributions**.
 
 ### Compiler
 
-- GCC 13+ **or** Clang 16+, with full C++23 support
+Use one of the following:
 
-### Dependencies
+- **GCC 14 or newer**
+- **Clang 16 or newer**
 
-| Library | Version | Purpose |
-|---|---|---|
-| [wxWidgets](https://wxwidgets.org) | ≥ 3.2 | Native desktop UI framework |
-| [SQLite3](https://sqlite.org) | any stable | Persistent conversation storage |
-| [Boost.Asio](https://boost.org) | ≥ 1.74 | Async TCP streaming to Ollama |
-| [Boost.UUID](https://boost.org) | ≥ 1.74 | Session identifiers |
-| [Boost.Spirit X3](https://boost.org) | ≥ 1.74 | Compile-time PEG parser for the Markdown pipeline |
-| [Boost.Regex](https://boost.org) | ≥ 1.74 | Pattern matching for the syntax highlighting engine |
-| [spdlog](https://github.com/gabime/spdlog) | ≥ 1.12 | Structured logging |
-| [glaze](https://github.com/stephenberry/glaze) | ≥ 2.0 | Compile-time JSON reflection |
+The compiler must support the C++23 features used by the project.
 
 ### Build System
 
-- CMake 3.28+
+- **CMake 3.28 or newer**
 
----
+### Core Libraries
+
+| Library | Version Requirement | Operational Intent |
+|---|---|---|
+| [wxWidgets](https://wxwidgets.org) | ≥ 3.3 | Native GTK-backed interface toolkit |
+| [SQLite3](https://sqlite.org) | Stable Release | Relational local query history engine |
+| [Boost.Asio](https://boost.org) | ≥ 1.74 | Asynchronous socket I/O loops |
+| [Boost.GIL](https://boost.org) | ≥ 1.74 | Graphic processing layout validation interface |
+| [libarchive](https://libarchive.org) | ≥ 3.6 | Decompression engine for compressed format files |
+| [pugixml](https://pugixml.org) | ≥ 1.12 | Light XPath text node traversal for XML objects |
+| [libpng](http://www.libpng.org/) | ≥ 1.6 | Low-level binary verification for PNG visuals |
+| [libjpeg](http://libjpeg.sourceforge.net/) | ≥ 9b | Low-level binary verification for JPEG/JPG visuals |
+| [poppler-cpp](https://poppler.freedesktop.org/) | Stable Release | PDF text mining utility |
+| [glaze](https://github.com/stephenberry/glaze) | ≥ 2.0 | High-performance compile-time compile json parsing |
+| [spdlog](https://github.com/gabime/spdlog) | ≥ 1.12 | Synchronized application tracking logger |
+
 
 ## Setup Guide
 
 ### 1. Install Ollama
 
-Choose the option for your distribution.
+Install and start Ollama using the appropriate method for your distribution.
 
 #### Arch Linux / CachyOS
 
@@ -175,11 +379,8 @@ sudo systemctl enable --now ollama
 sudo apt install ollama
 ```
 
-Or via Snap:
-
-```bash
-sudo snap install ollama
-```
+If Ollama is not available in your distribution's configured repositories, use
+the installation method documented by Ollama.
 
 #### Fedora / RHEL
 
@@ -187,89 +388,221 @@ sudo snap install ollama
 curl -fsSL https://ollama.com/install.sh | sh
 ```
 
-#### All other distributions
+After installation, verify that Ollama is available:
 
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
+ollama --version
+```
+
+If the Ollama service is not already running, start it with:
+
+```bash
+ollama serve
 ```
 
 ---
 
 ### 2. Pull a Model
 
-Once the Ollama service is running, pull a model:
+#### Text and Code Model
+
+For standard text and programming tasks:
 
 ```bash
-ollama pull llama3.2
-ollama list      # verify it appears in the registry
+ollama pull qwen2.5-coder:7b
 ```
 
-Any model from [ollama.com/library](https://ollama.com/library) works.
-Tested with `llama3.2`, `qwen2.5-coder`, and `mistral`.
+#### Multimodal Model
+
+To test image attachments, install a model that supports vision input:
+
+```bash
+ollama pull qwen2-vl:7b
+```
+
+You can list locally installed models with:
+
+```bash
+ollama list
+```
+
+> [!TIP]
+> Model names and availability may vary between Ollama releases. Use a model
+> that fits within your available system RAM or GPU VRAM.
 
 ---
 
-### 3. Build Malama
+### 3. Install Build Dependencies
 
-#### Install system dependencies
+#### Arch Linux / CachyOS
 
-**Arch / CachyOS**
 ```bash
-sudo pacman -S cmake wxwidgets-gtk3 sqlite boost spdlog
+sudo pacman -S \
+    base-devel \
+    cmake \
+    wxwidgets-gtk3 \
+    sqlite \
+    boost \
+    spdlog \
+    libarchive \
+    pugixml \
+    libpng \
+    libjpeg-turbo \
+    poppler
 ```
 
-**Debian / Ubuntu**
+#### Debian / Ubuntu / Linux Mint
+
 ```bash
-sudo apt install build-essential cmake libwxgtk3.2-dev \
-                 libsqlite3-dev libboost-all-dev libspdlog-dev
+sudo apt update
+
+sudo apt install \
+    build-essential \
+    cmake \
+    libwxgtk3.2-dev \
+    libsqlite3-dev \
+    libboost-all-dev \
+    libspdlog-dev \
+    libarchive-dev \
+    libpugixml-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libpoppler-cpp-dev
 ```
 
-#### Clone the repository
+> [!NOTE]
+> Package names can differ between distribution releases. In particular,
+> wxWidgets development packages may be versioned differently.
+
+---
+
+### 4. Clone and Build Malama
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/Magpiny/malama.git
 cd malama
 ```
 
-#### Configure and build
+Configure a release build:
 
 ```bash
-mkdir build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . -j$(nproc)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 ```
 
-#### Run
+Compile the application:
 
 ```bash
-./malama
+cmake --build build --parallel "$(nproc)"
 ```
+
+---
+
+### 5. Run Malama
+
+Run the compiled application from the build directory:
+
+```bash
+./build/malama
+```
+
+Ensure that the Ollama service is running before starting a conversation.
 
 ---
 
 ## Usage
 
-**Sending a prompt**
-Type in the input field at the bottom of the window and press `Enter` or click **Send**.
+### Attach Context Files
 
-**Session controls**
-Right-click any entry in the sidebar to pin, rename, or delete that conversation.
+Click the **paperclip button 📎** next to the prompt editor and select one or more
+supported documents or images.
 
-**Switching sessions**
-Click any sidebar entry to instantly restore that conversation exactly where you left off.
+Selected files appear in the attachment staging tray before being submitted.
 
-**Changing models**
-Open **Settings → Engine** and select any model from the dropdown. The list is
-populated live from your local Ollama instance — pull new models with `ollama pull`
-and they appear on next launch.
+### Remove Staged Files
 
-**Reasoning filter**
-Open **Settings → Preferences** and toggle **Filter reasoning blocks** to hide
-`<think>` output from models like DeepSeek-R1 and QwQ. Takes effect immediately
-without restarting the current session.
+If a file was attached accidentally, click the remove button (X) on its attachment
+chip.
+
+The file will be excluded from the next request without affecting the remaining
+staged attachments.
+
+### Open a Previous Conversation
+
+Move the pointer over an entry in the conversation sidebar.
+
+Valid entries display a hand cursor and tooltip. Select an entry to restore its
+conversation history in the active chat workspace.
+
+### Filter Reasoning Blocks
+
+Open:
+
+```text
+Settings → Preferences → Filter reasoning blocks
+```
+
+Enable the option to remove structural `<think>` blocks produced by supported
+reasoning models.
+
+The setting is applied to active response streams without requiring an
+application restart.
+
+### Use Image Attachments
+
+Attach a supported image and select a multimodal model before submitting the
+prompt.
+
+For example:
+
+```text
+Describe the architecture shown in the attached diagram.
+```
+
+### Use Documents as Reference Context
+
+Attach a supported document and provide a clear instruction:
+
+```text
+Summarize the attached document and list its main technical decisions.
+```
+
+For better results, identify the attached material as reference context rather
+than relying on the model to infer your intent.
 
 ---
 
-<div align="center">
-  <sub>Built with C++23 · wxWidgets · Boost.Asio · Boost.Spirit(X3) - Boost.Regex - SQLite3 · glaze · spdlog</sub>
+## Privacy
+
+Malama is designed around local model execution:
+
+- Conversation history is stored locally.
+- Requests are sent to your configured Ollama instance.
+- No Malama cloud account is required.
+- No embedded browser engine is used.
+- Attached documents are processed on the host system.
+
+Your overall privacy still depends on your operating system, Ollama
+configuration, installed models, and network environment.
+
+---
+
+## License
+
+Malama is distributed under the terms of the
+[GNU General Public License v3.0](LICENSE).
+
+t for local intelligence on Linux
+
+<sub>
+C++23 · wxWidgets · Boost.Asio · Boost.GIL · Boost.Spirit X3 · Boost.Regex ·
+SQLite3 · Glaze · spdlog
+</sub>
+
+<br />
+<br />
+
+**Private by default. Native by design.**
+
 </div>

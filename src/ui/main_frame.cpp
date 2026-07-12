@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/main_frame.cpp
 // Purpose:     Implements top-level window controls and menu modal dialog loops
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S<samuelwanjare@proton.me>
 // Created:     2026-06-15
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -174,13 +174,13 @@ void MainFrame::LoadMostRecentSessionOnStartup() noexcept {
         return;
     }
 
-    std::sort(sessions_list.begin(), sessions_list.end(),
-              [](const core::SessionMetadata &lhs, const core::SessionMetadata &rhs) {
-                  if (lhs.m_is_pinned != rhs.m_is_pinned) {
-                      return lhs.m_is_pinned > rhs.m_is_pinned;
-                  }
-                  return lhs.m_updated_at > rhs.m_updated_at;
-              });
+    std::ranges::sort(sessions_list,
+                      [](const core::SessionMetadata &lhs, const core::SessionMetadata &rhs) {
+                          if (lhs.m_is_pinned != rhs.m_is_pinned) {
+                              return lhs.m_is_pinned > rhs.m_is_pinned;
+                          }
+                          return lhs.m_updated_at > rhs.m_updated_at;
+                      });
 
     m_current_session_id = sessions_list.front().m_session_id;
     auto active_session = m_history_manager_ptr->LoadSession(m_current_session_id);
@@ -308,7 +308,6 @@ void MainFrame::apply_appearance_settings() noexcept {
     this->Refresh();
 }
 
-// FIXED: Parameters signature mapped via clean macros
 void MainFrame::on_preferences_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     SettingsDialog dialog(this);
     if (dialog.ShowModal() == wxID_OK) {
@@ -316,23 +315,20 @@ void MainFrame::on_preferences_action(wxCommandEvent &WXUNUSED(event)) noexcept 
     }
 }
 
-// FIXED: Clear macro tracking filters unreferenced bounds safely
 void MainFrame::on_exit_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     Close(true);
 }
 
-// FIXED: Safe macro handling filters warning conditions
 void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     wxAboutDialogInfo info;
     info.SetName(_("Malama"));
-    info.SetVersion(_("0.2.6"));
+    info.SetVersion(_("0.2.7-7"));
     info.SetDescription(
-        _("Native Linux chat client for local LLMs — no cloud, no browser, no compromise."));
-    info.SetCopyright(_("Copyright (C) 2026"));
-    info.SetWebSite(_("https://magpiny.dev"));
-    info.AddDeveloper(_("Wanjare Samuel"));
-
-    wxAboutBox(info);
+        wxT("Native Linux chat client for local LLMs — no cloud, no browser, no compromise."));
+    info.SetCopyright(wxT("Copyright (C) 2026"));
+    info.SetWebSite(wxT("https://magpiny.dev"));
+    info.AddDeveloper(wxT("Wanjare Samuel"));
+    wxAboutBox(info, this);
 }
 
 enum class LicenceDialogError : std::uint8_t {

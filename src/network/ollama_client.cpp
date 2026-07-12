@@ -1,227 +1,185 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_client.cpp
-// Purpose:     Implements the Boost.Asio non-blocking socket state machine
-// Author:      Wanjare <wanjare@magpiny.dev>
-// Created:     2026-06-12
+// Purpose:     Implements stackless awaitable loops with chunk parsing boundaries
+// Author:      Wanjare <wanpiny.dev>
+// Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-V3-or-later
 // /////////////////////////////////////////////////////////////////////////////
-
-// SPDX-License-Identifier: Apache-2.0
 
 #include "network/ollama_client.hpp"
 
-#include <chrono>
+#include <algorithm>
+#include <array>
+#include <boost/asio/as_tuple.hpp>
+#include <boost/asio/this_coro.hpp>
+#include <boost/beast/core.hpp>
+#include <boost/beast/http.hpp>
+#include <boost/cobalt/generator.hpp>
 #include <format>
+#include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
 
 #include "common/constants.hpp"
-#include "network/ollama_requests.hpp"
 
 namespace malama::network {
 
-OllamaClient::OllamaClient(std::string host, std::string port) noexcept
-    : m_resolver(m_io_context),
-      m_socket(m_io_context),
-      m_operation_timer(m_io_context),
-      m_host(std::move(host)),
-      m_port(std::move(port)) {}
+OllamaClient::OllamaClient(std::string host_name, std::string port_number) noexcept
+    : m_socket(m_io_context),
+      m_host(std::move(host_name)),
+      m_port(std::move(port_number)),
+      m_work_guard(boost::asio::make_work_guard(m_io_context)),
+      m_worker_thread([this]() { m_io_context.run(); }) {}
 
 OllamaClient::~OllamaClient() noexcept {
-    boost::system::error_code err_code;
+    m_work_guard.reset();
     m_io_context.stop();
-
-    // 1. Capture the result object
-    const auto cancel_result = m_socket.cancel(err_code);
-
-    // 2. Perform a trivial inspection to satisfy the linter
-    if (cancel_result == boost::system::errc::success || err_code) {
-        spdlog::trace("Socket teardown (cancel): {}", err_code.message());
+    if (m_worker_thread.joinable()) {
+        m_worker_thread.join();
     }
-
-    const auto close_result = m_socket.close(err_code);
-    if (close_result == boost::system::errc::success || err_code) {
-        spdlog::trace("Socket teardown (close): {}", err_code.message());
-    }
+    boost::system::error_code error_code;
+    m_socket.close(error_code);
 }
 
-auto OllamaClient::SubmitPrompt(std::string_view prompt_text, std::string_view model_name,
-                                std::function<void(std::string_view)> on_data) noexcept -> void {
-    bool expected = false;
-    if (!m_operation_in_progress.compare_exchange_strong(expected, true)) {
-        spdlog::warn(
-            "SubmitPrompt called while operation in progress; ignoring concurrent request");
-        return;
+auto OllamaClient::GetExecutor() noexcept -> boost::asio::io_context::executor_type {
+    return m_io_context.get_executor();
+}
+
+void OllamaClient::TriggerActiveGenerationCancellation() noexcept {
+    m_cancellation_requested.store(true);
+    boost::system::error_code ignore_error;
+    m_socket.close(ignore_error);
+}
+
+auto OllamaClient::CheckCache(const std::string &cache_key) noexcept -> std::optional<std::string> {
+    auto iterator = m_cache_store.m_lookup_table.find(cache_key);
+    if (iterator != m_cache_store.m_lookup_table.end()) {
+        spdlog::info("In-memory cache hit achieved for prompt signature context.");
+        return iterator->second;
+    }
+    return std::nullopt;
+}
+
+auto OllamaClient::UpdateCache(const std::string &cache_key,
+                               const std::string &response_value) noexcept -> void {
+    if (m_cache_store.m_lookup_table.size() >= ResponseCache::max_cache_entries) {
+        std::string oldest_key = m_cache_store.m_access_order.front();
+        m_cache_store.m_lookup_table.erase(oldest_key);
+        m_cache_store.m_access_order.erase(m_cache_store.m_access_order.begin());
+    }
+    m_cache_store.m_lookup_table[cache_key] = response_value;
+    m_cache_store.m_access_order.push_back(cache_key);
+}
+
+auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_view prompt_text,
+                                     const std::vector<std::string> &images_payload,
+                                     std::function<void(std::string_view)> token_callback) noexcept
+    -> boost::cobalt::task<std::expected<void, common::NetworkError>> {
+    if (m_is_streaming.load()) {
+        co_return std::unexpected(common::NetworkError::HostUnreachable);
     }
 
-    m_on_data_callback = std::move(on_data);
+    m_cancellation_requested.store(false);
+    m_residual_line_accumulator.clear();
 
-    OllamaGenerateRequest payload{
-        .model = std::string(model_name), .prompt = std::string(prompt_text), .stream = true};
+    std::string cache_key = std::format("{}:{}", model_name, prompt_text);
+    auto cached_response = CheckCache(cache_key);
+    if (cached_response.has_value() && token_callback) {
+        token_callback(cached_response.value());
+        co_return std::expected<void, common::NetworkError>{};
+    }
+
+    m_is_streaming.store(true);
+    auto executor = co_await boost::asio::this_coro::executor;
+    boost::asio::ip::tcp::resolver resolver(executor);
+
+    auto endpoints_result = co_await resolver.async_resolve(m_host, m_port, boost::asio::as_tuple);
+    if (std::get<0>(endpoints_result)) {
+        m_is_streaming.store(false);
+        co_return std::unexpected(common::NetworkError::HostUnreachable);
+    }
+
+    boost::beast::tcp_stream stream(executor);
+    co_await stream.async_connect(std::get<1>(endpoints_result), boost::asio::as_tuple);
+
+    MultimodalPayload payload{.m_model = std::string(model_name),
+                              .m_prompt = std::string(prompt_text),
+                              .m_stream = true,
+                              .m_images = images_payload};
 
     std::string json_body;
+    [[maybe_unused]] const auto write_error = glz::write_json(payload, json_body);
 
-    if (const auto parse_error = glz::write_json(payload, json_body); parse_error) {
-        spdlog::error("Failed to serialize outbound JSON payload. Error flag: {}",
-                      static_cast<int>(parse_error.ec));
-        m_operation_in_progress.store(false);
-        return;
+    boost::beast::http::request<boost::beast::http::string_body> request_packet{
+        boost::beast::http::verb::post, "/api/generate", 11};
+    request_packet.set(boost::beast::http::field::host, m_host);
+    request_packet.set(boost::beast::http::field::content_type, "application/json");
+    request_packet.body() = json_body;
+    request_packet.prepare_payload();
+
+    co_await boost::beast::http::async_write(stream, request_packet, boost::asio::as_tuple);
+
+    boost::beast::flat_buffer static_buffer;
+    boost::beast::http::response_parser<boost::beast::http::string_body> response_parser;
+    response_parser.body_limit(std::numeric_limits<std::uint64_t>::max());
+
+    co_await boost::beast::http::async_read_header(stream, static_buffer, response_parser,
+                                                   boost::asio::as_tuple);
+
+    std::string complete_stream_accumulation;
+    while (!response_parser.is_done()) {
+        // Intercept loops securely if user requests cancellation
+        if (m_cancellation_requested.load()) {
+            if (token_callback) {
+                token_callback("\n\n[Prompt generation stopped by the user.]");
+            }
+            stream.close();
+            break;
+        }
+
+        auto [read_error, bytes_transferred] = co_await boost::beast::http::async_read_some(
+            stream, static_buffer, response_parser, boost::asio::as_tuple);
+
+        if (bytes_transferred > 0) {
+            auto &body_chunk = response_parser.get().body();
+            if (!body_chunk.empty()) {
+                // FIXED: Append incoming frames directly to our loopahead buffer
+                m_residual_line_accumulator.append(body_chunk);
+                body_chunk.clear();
+
+                std::size_t newline_position = 0;
+                while ((newline_position = m_residual_line_accumulator.find('\n')) !=
+                       std::string::npos) {
+                    // Create zero-copy views to parse lines without temporary string copies
+                    std::string_view zero_copy_line_view(m_residual_line_accumulator.data(),
+                                                         newline_position);
+
+                    if (!zero_copy_line_view.empty() && zero_copy_line_view.front() == '{') {
+                        ResponseChunk chunk;
+                        auto parser_error = glz::read<glz::opts{.error_on_unknown_keys = false}>(
+                            chunk, zero_copy_line_view);
+
+                        if (!parser_error && token_callback) {
+                            token_callback(chunk.m_response);
+                            complete_stream_accumulation += chunk.m_response;
+                        }
+                    }
+                    m_residual_line_accumulator.erase(0, newline_position + 1);
+                }
+            }
+        }
+
+        if (read_error == boost::beast::http::error::end_of_stream || read_error) {
+            break;
+        }
     }
 
-    m_request_buffer = std::format(
-        "POST {} HTTP/1.0\r\n"
-        "Host: {}:{}\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: {}\r\n\r\n"
-        "{}",
-        constants::ollama_generate_path, m_host, m_port, json_body.size(), json_body);
+    if (!complete_stream_accumulation.empty() && !m_cancellation_requested.load()) {
+        UpdateCache(cache_key, complete_stream_accumulation);
+    }
 
-    m_io_context.restart();
-    DoResolve();
-
-    m_context_thread = std::jthread([this]() { m_io_context.run(); });
-}
-
-auto OllamaClient::DoResolve() noexcept -> void {
-    m_operation_timer.expires_after(std::chrono::seconds(constants::NETWORK_RESOLVE_TIMEOUT_SEC));
-    m_operation_timer.async_wait([this]([[maybe_unused]] boost::system::error_code err_code) {
-        if (!err_code) {
-            spdlog::error("DNS resolution timeout exceeded");
-            // Fixed: Resolver returns void, so we call it directly without assigning it
-            m_resolver.cancel();
-        } else {
-            // Fixed: Fully consume the err_code parameter so the linter stops complaining
-            spdlog::trace("DNS timer gracefully aborted: {}", err_code.message());
-        }
-    });
-
-    m_resolver.async_resolve(m_host, m_port,
-                             [this]([[maybe_unused]] boost::system::error_code err_code,
-                                    const boost::asio::ip::tcp::resolver::results_type &endpoints) {
-                                 const auto timer_cancel_result = m_operation_timer.cancel();
-                                 if (timer_cancel_result >= 0) {
-                                     spdlog::trace("DNS timer successfully cancelled.");
-                                 }
-
-                                 if (!err_code) [[likely]] {
-                                     DoConnect(endpoints);
-                                 } else {
-                                     spdlog::error("Socket DNS resolution failure: {}",
-                                                   err_code.message());
-                                     m_operation_in_progress.store(false);
-                                 }
-                             });
-}
-
-auto OllamaClient::DoConnect(const boost::asio::ip::tcp::resolver::results_type &endpoints) noexcept
-    -> void {
-    m_operation_timer.expires_after(std::chrono::seconds(constants::NETWORK_CONNECT_TIMEOUT_SEC));
-    m_operation_timer.async_wait([this]([[maybe_unused]] boost::system::error_code err_code) {
-        if (!err_code) {
-            spdlog::error("TCP connection timeout exceeded");
-
-            boost::system::error_code close_error;
-            const auto close_result = m_socket.close(close_error);
-            if (close_result == boost::system::errc::success || close_error) {
-                spdlog::debug("Forced socket closure on connect timeout note: {}",
-                              close_error.message());
-            }
-        } else {
-            spdlog::trace("Connect timer gracefully aborted: {}", err_code.message());
-        }
-    });
-
-    boost::asio::async_connect(m_socket, endpoints,
-                               [this]([[maybe_unused]] boost::system::error_code err_code,
-                                      const boost::asio::ip::tcp::endpoint & /*endpoint*/) {
-                                   const auto timer_cancel_result = m_operation_timer.cancel();
-                                   if (timer_cancel_result >= 0) {
-                                       spdlog::trace("Connect timer successfully cancelled.");
-                                   }
-
-                                   if (!err_code) [[likely]] {
-                                       DoWrite();
-                                   } else {
-                                       spdlog::error("TCP Socket connection refused: {}",
-                                                     err_code.message());
-                                       m_operation_in_progress.store(false);
-                                   }
-                               });
-}
-
-auto OllamaClient::DoWrite() noexcept -> void {
-    m_operation_timer.expires_after(std::chrono::seconds(constants::NETWORK_WRITE_TIMEOUT_SEC));
-    m_operation_timer.async_wait([this]([[maybe_unused]] boost::system::error_code err_code) {
-        if (!err_code) {
-            spdlog::error("TCP write timeout exceeded");
-
-            boost::system::error_code close_error;
-            const auto close_result = m_socket.close(close_error);
-            if (close_result == boost::system::errc::success || close_error) {
-                spdlog::debug("Forced socket closure on write timeout note: {}",
-                              close_error.message());
-            }
-        } else {
-            spdlog::trace("Write timer gracefully aborted: {}", err_code.message());
-        }
-    });
-
-    boost::asio::async_write(m_socket, boost::asio::buffer(m_request_buffer),
-                             [this]([[maybe_unused]] boost::system::error_code err_code,
-                                    std::size_t /*bytes_transferred*/) {
-                                 const auto timer_cancel_result = m_operation_timer.cancel();
-                                 if (timer_cancel_result >= 0) {
-                                     spdlog::trace("Write timer successfully cancelled.");
-                                 }
-
-                                 if (!err_code) [[likely]] {
-                                     DoRead();
-                                 } else {
-                                     spdlog::error("TCP Socket payload transmission fault: {}",
-                                                   err_code.message());
-                                     m_operation_in_progress.store(false);
-                                 }
-                             });
-}
-
-auto OllamaClient::DoRead() noexcept -> void {
-    m_operation_timer.expires_after(std::chrono::seconds(constants::NETWORK_READ_TIMEOUT_SEC));
-    m_operation_timer.async_wait([this]([[maybe_unused]] boost::system::error_code err_code) {
-        if (!err_code) {
-            spdlog::error("TCP read timeout exceeded");
-
-            boost::system::error_code close_error;
-            const auto close_result = m_socket.close(close_error);
-            if (close_result == boost::system::errc::success || close_error) {
-                spdlog::debug("Forced socket closure on read timeout note: {}",
-                              close_error.message());
-            }
-        } else {
-            spdlog::trace("Read timer gracefully aborted: {}", err_code.message());
-        }
-    });
-
-    m_socket.async_read_some(
-        boost::asio::buffer(m_read_buffer),
-        [this]([[maybe_unused]] boost::system::error_code err_code, std::size_t bytes_transferred) {
-            const auto timer_cancel_result = m_operation_timer.cancel();
-            if (timer_cancel_result >= 0) {
-                spdlog::trace("Read timer successfully cancelled.");
-            }
-
-            if (!err_code) [[likely]] {
-                if (m_on_data_callback) {
-                    m_on_data_callback(std::string_view(m_read_buffer.data(), bytes_transferred));
-                }
-                DoRead();
-            } else if (err_code == boost::asio::error::eof) {
-                spdlog::info("Ollama TCP socket closed cleanly by host (EOF).");
-                m_operation_in_progress.store(false);
-            } else {
-                spdlog::error("TCP Socket read stream fault: {}", err_code.message());
-                m_operation_in_progress.store(false);
-            }
-        });
+    m_is_streaming.store(false);
+    co_return std::expected<void, common::NetworkError>{};
 }
 
 }  // namespace malama::network
