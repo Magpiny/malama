@@ -1,35 +1,23 @@
-
 <div align="center">
 
-./assets/ic_malama.jpeg
+<img src="https://raw.githubusercontent.com/Magpiny/malama/main/assets/ic_malama.jpeg" alt="Malama" width="120" />
 
 # Malama
 
-### A native Linux chat client for local LLMs
+***Malama is a lightweight, private, and fully native desktop interface for chatting  21with large language models running locally through Ollama.***
 
-**No cloud. No browser. No compromise.**
-
-https://img.shields.io/badge/License-GPLv3-blue.svg](LICENSE)
-https://img.shields.io/badge/C%2B%2B-23-00599C.svg](#build-requirements)
-https://img.shields.io/badge/Platform-Linux-FCC624.svg](#build-requirements)
-https://img.shields.io/badge/UI-wxWidgets%203.3-2F80ED.svg](https://www.wxwidgets.org/)
-https://img.shields.io/badge/Backend-Ollama-orange.svg](https://ollama.com/)
-https://img.shields.io/badge/Version-0.2.7--7-708090.svg](#whats-new-in-v027-7)
-
-<br />
-
-Malama is a lightweight, private, and fully native desktop interface for chatting  
-with large language models running locally through Ollama.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](#)
+[![Platform: Linux](https://img.shields.io/badge/platform-Linux-lightgrey.svg)](#)
+[![wxWidgets](https://img.shields.io/badge/UI-wxWidgets%203.3-green.svg)](#)
+[![Ollama](https://img.shields.io/badge/backend-Ollama-orange.svg)](#)
+[![Version](https://img.shields.io/badge/version-0.2.7--7-informational.svg)](#)
 
 </div>
 
 ---
 
-<div align="center">
-
-./assets/malama_ui.png
-
-</div>
+![Malama v0.2.7-7 UI](https://raw.githubusercontent.com/Magpiny/malama/main/assets/malama_ui.png)
 
 ---
 
