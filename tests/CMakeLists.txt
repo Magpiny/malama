@@ -1,93 +1,52 @@
-# /////////////////////////////////////////////////////////////////////////////
+# // ///////////////////////////////////////////////////////////////////////////
 # Name:        tests/CMakeLists.txt
-# Purpose:     Unit test build configuration for malama — GTest via FetchContent
-# Author:      Wanjare <wanjare@magpiny.dev>
-# Created:     2026-06-08
+# Purpose:     Modular test execution harness relying on Catch2 v3 automation
+# Author:      Wanjare S. <samuelwanjare@protonmail.com>
+# Created:     2026-07-15
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
-# Licence:     Apache-2.0
-# /////////////////////////////////////////////////////////////////////////////
+# Licence:     GPL-3.0-or-later
+# // ///////////////////////////////////////////////////////////////////////////
 
 include(FetchContent)
 
 FetchContent_Declare(
-    googletest
-    GIT_REPOSITORY https://github.com/google/googletest.git
-    GIT_TAG        v1.15.2
-    GIT_SHALLOW    TRUE
-    SOURCE_DIR     ${CMAKE_SOURCE_DIR}/libs/googletest
+    Catch2
+    GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+    GIT_TAG        v3.6.0
+    SYSTEM
 )
-# Prevent GTest from overriding our compiler/linker settings on Windows
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
+
+FetchContent_MakeAvailable(Catch2)
+
+# FIXED: Explicitly append Catch2's custom cmake module path to the search registry
+list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
 
 enable_testing()
-include(GoogleTest)
+
+# FIXED: Catch2 v3 provides its discovery macros inside 'Catch.cmake' rather than 'Catch2'
+include(Catch)
 
 # ---------------------------------------------------------------------------
-# test_main_init — tests for MalamaApp::OnInit allocation guards and constants
-# Does NOT require wxWidgets; tests pure C++ logic and constant values only.
+# Target Definition: malama_tests (Isolated Execution Runner Workspace)
 # ---------------------------------------------------------------------------
-add_executable(test_main_init
-    ${CMAKE_CURRENT_SOURCE_DIR}/main_test.cpp
+add_executable(malama_tests
+    main_test.cpp
+    unit/test_base64.cpp
+    unit/test_mime_detector.cpp
+    unit/test_attachment_bounds.cpp
+    unit/test_context_enclosure.cpp
 )
 
-target_include_directories(test_main_init PRIVATE
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/libs
-)
+target_compile_features(malama_tests PRIVATE cxx_std_23)
 
-target_compile_features(test_main_init PUBLIC cxx_std_23)
-
-target_compile_options(test_main_init PRIVATE
-    -Wall -Wextra -Wpedantic
+target_compile_options(malama_tests PRIVATE
+    -Wall -Wextra -Wno-c2y-extensions -Wpedantic
     -fstack-protector-strong
 )
 
-target_link_libraries(test_main_init PRIVATE
-    GTest::gtest
-    GTest::gtest_main
-    spdlog::spdlog
+target_link_libraries(malama_tests PRIVATE
+    malama_core
+    Catch2::Catch2WithMain
 )
 
-gtest_discover_tests(test_main_init)
-
-# ---------------------------------------------------------------------------
-# test_network_ui — tests for EVT_MALAMA_TOKEN event type and token handling
-# Requires wxWidgets 3.2 (same version enforced by the PR diff in the root
-# CMakeLists.txt).  If wxWidgets is absent the target is skipped gracefully.
-# ---------------------------------------------------------------------------
-find_package(wxWidgets 3.2 QUIET COMPONENTS core base)
-
-if(wxWidgets_FOUND)
-    include(${wxWidgets_USE_FILE})
-
-    add_executable(test_network_ui
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_network_ui.cpp
-        ${CMAKE_SOURCE_DIR}/src/ui/main_frame.cpp
-    )
-
-    target_include_directories(test_network_ui PRIVATE
-        ${CMAKE_SOURCE_DIR}/src
-        ${CMAKE_SOURCE_DIR}/libs
-    )
-
-    target_compile_features(test_network_ui PUBLIC cxx_std_23)
-
-    target_compile_definitions(test_network_ui PRIVATE SPDLOG_USE_STD_FORMAT)
-
-    target_compile_options(test_network_ui PRIVATE
-        -Wall -Wextra -Wpedantic
-        -fstack-protector-strong
-    )
-
-    target_link_libraries(test_network_ui PRIVATE
-        GTest::gtest
-        ${wxWidgets_LIBRARIES}
-        spdlog::spdlog
-    )
-
-    gtest_discover_tests(test_network_ui)
-else()
-    message(STATUS
-        "wxWidgets 3.2 not found — skipping test_network_ui build target")
-endif()
+catch_discover_tests(malama_tests)

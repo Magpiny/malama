@@ -267,7 +267,7 @@ void ChatPanel::refresh_attachment_tray() noexcept {
         auto *close_button =
             new (std::nothrow) wxButton(chip, wxID_ANY, wxString::FromUTF8("❌"), wxDefaultPosition,
                                         wxDefaultSize, wxBU_EXACTFIT | wxBORDER_NONE);
-        close_button->SetBackgroundColour(wxColour("#420912"));
+        close_button->SetBackgroundColour(wxColour("#2D2D2D"));
         close_button->SetForegroundColour(wxColour("#F5F5F7"));
         close_button->SetCursor(wxCursor(wxCURSOR_HAND));
         close_button->SetToolTip("Forcibly drop this asset signature from current prompt queue");
@@ -288,7 +288,7 @@ void ChatPanel::refresh_attachment_tray() noexcept {
                         control_element_padding);
 
         chip->SetSizer(chip_sizer);
-        chip->SetBackgroundColour(wxColour("#420912"));
+        chip->SetBackgroundColour(wxColour("#2d2d2d"));
 
         m_tray_sizer_ptr->Add(chip, 0, wxALIGN_CENTER_VERTICAL | wxALL, control_element_padding);
     }

@@ -1,10 +1,10 @@
 # /////////////////////////////////////////////////////////////////////////////
 # Name:        CMakeLists.txt
-# Purpose:     Root modern target-based compilation build for malama
+# Purpose:     Root build orchestration with fully resolved symbol linking
 # Author:      Wanjare S. <samuelwanjare@protonmail.com>
-# Created:     2026-06-10
+# Created:     2026-07-16
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
-# Licence:     Apache-2.0
+# Licence:     GPL-3.0-or-later
 # /////////////////////////////////////////////////////////////////////////////
 
 cmake_minimum_required(VERSION 3.28)
@@ -28,40 +28,42 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     )
 endif()
 
-# -----------------------------------------------------------------------------
-# DEPENDENCY RESOLUTION SECTION
-# -----------------------------------------------------------------------------
+# Append custom script path matrices into global index arrays
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+include(ResolveDependency)
 
-# Find core multi-threading library primitives
-find_package(Threads REQUIRED)
+# ---------------------------------------------------------------------------
+# Interactive System Dependency Checking Matrix Blocks
+# ---------------------------------------------------------------------------
 
-# Discover local installation footprint of wxWidgets 3.2+
-find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html)
-include(${wxWidgets_USE_FILE})
-
-# FIXED: Removed 'cobalt' from components to prevent missing binary errors
-find_package(Boost REQUIRED COMPONENTS regex iostreams cobalt context)
-find_package(pugixml REQUIRED)
-find_package(LibArchive REQUIRED)
-find_package(JPEG REQUIRED)
-find_package(PNG REQUIRED)
-find_package(SQLite3 REQUIRED)
-
-# Extract native Poppler configuration layouts via PkgConfig
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(POPPLER_CPP REQUIRED poppler-cpp)
-
-# Provision third-party frameworks from remote sources
-include(FetchContent)
-
-set(SPDLOG_USE_STD_FORMAT ON CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        v1.17.0
-    GIT_SHALLOW    TRUE
+resolve_dependency(
+    TARGET_NAME  "spdlog"
+    FIND_NAME    "spdlog"
+    REASON       "Required for colorized asynchronous console application logs."
+    PACMAN_NAME  "spdlog"
+    APT_NAME     "libspdlog-dev"
+    DNF_NAME     "spdlog-devel"
 )
-FetchContent_MakeAvailable(spdlog)
+
+resolve_dependency(
+    TARGET_NAME  "pugixml"
+    FIND_NAME    "pugixml"
+    REASON       "Required to perform light XPath node traversals inside files."
+    PACMAN_NAME  "pugixml"
+    APT_NAME     "libpugixml-dev"
+    DNF_NAME     "pugixml-devel"
+)
+
+resolve_dependency(
+    TARGET_NAME  "LibArchive"
+    FIND_NAME    "LibArchive"
+    REASON       "Provides memory-safe decompression streams preventing zip threats."
+    PACMAN_NAME  "libarchive"
+    APT_NAME     "libarchive-dev"
+    DNF_NAME     "libarchive-devel"
+)
+
+include(FetchContent)
 
 FetchContent_Declare(
     glaze
@@ -71,65 +73,80 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glaze)
 
-# -----------------------------------------------------------------------------
-# TARGET CREATION AND LINKAGE
-# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Core System Verification Fallbacks
+# ---------------------------------------------------------------------------
+find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html adv)
+find_package(SQLite3 REQUIRED)
+find_package(PNG REQUIRED)
+find_package(JPEG REQUIRED)
 
-add_executable(malama
-    src/main.cpp
-    src/core/config_manager.cpp
-    src/network/ollama_client.cpp
-    src/network/stream_worker.cpp
-    src/ui/main_frame.cpp
-    src/ui/sidebar_panel.cpp
-    src/ui/chat_panel.cpp
-    src/ui/settings_dialog.cpp
-    src/ui/error_banner.cpp
+# FIXED: Explicitly map and resolve compiled binary symbols for Boost Cobalt coroutines
+find_package(Boost REQUIRED COMPONENTS cobalt)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
+
+# ---------------------------------------------------------------------------
+# Target Specification: malama_core Static Library Subsystem
+# ---------------------------------------------------------------------------
+add_library(malama_core STATIC
     src/config/config_manager.cpp
     src/engine/markdown/pipeline.cpp
-    src/engine/markdown/syntax_registry.cpp
-    src/engine/storage/history_manager.cpp
+    src/engine/markdown/syntax_registry.cpp # FIXED: Added missing domain component
     src/engine/storage/attachment_manager.cpp
+    src/engine/storage/history_manager.cpp
     src/engine/storage/parsers/archive_reader.cpp
-    src/engine/storage/parsers/plain_text_parser.cpp
-    src/engine/storage/parsers/xml_parser.cpp
     src/engine/storage/parsers/docx_parser.cpp
-    src/engine/storage/parsers/odt_parser.cpp
     src/engine/storage/parsers/epub_parser.cpp
-    src/engine/storage/parsers/pdf_parser.cpp
-    src/engine/storage/parsers/xlsx_parser.cpp
-    src/engine/storage/parsers/ods_parser.cpp
     src/engine/storage/parsers/image_parser.cpp
+    src/engine/storage/parsers/ods_parser.cpp
+    src/engine/storage/parsers/odt_parser.cpp
     src/engine/storage/parsers/parser_factory.cpp
+    src/engine/storage/parsers/pdf_parser.cpp
+    src/engine/storage/parsers/plain_text_parser.cpp
+    src/engine/storage/parsers/xlsx_parser.cpp
+    src/engine/storage/parsers/xml_parser.cpp
+    src/network/ollama_client.cpp
+    src/network/stream_worker.cpp
 )
 
-target_compile_definitions(malama PRIVATE SPDLOG_USE_STD_FORMAT)
-target_compile_features(malama PUBLIC cxx_std_23)
+target_include_directories(malama_core PUBLIC include src libs)
 
-target_include_directories(malama PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${CMAKE_SOURCE_DIR}/src
-    ${Boost_INCLUDE_DIRS}
-    ${LibArchive_INCLUDE_DIRS}
-    ${POPPLER_CPP_INCLUDE_DIRS}
-    ${JPEG_INCLUDE_DIR}
-    ${PNG_INCLUDE_DIRS}
+target_link_libraries(malama_core PUBLIC
+    SQLite3::SQLite3
+    glaze::glaze
+    pugixml
+    PNG::PNG
+    JPEG::JPEG
+    PkgConfig::POPPLER_CPP
+    spdlog::spdlog
+    Boost::cobalt # FIXED: Linked binary coroutine symbols
+    LibArchive::LibArchive # FIXED: Switched to explicit modern target referencing
 )
+
+# ---------------------------------------------------------------------------
+# Target Specification: malama Desktop Graphical User Interface
+# ---------------------------------------------------------------------------
+add_executable(malama
+    src/main.cpp
+    src/ui/chat_panel.cpp
+    src/ui/error_banner.cpp
+    src/ui/main_frame.cpp
+    src/ui/settings_dialog.cpp # FIXED: Added missing user interface modal layout
+    src/ui/sidebar_panel.cpp
+)
+
+include(${wxWidgets_USE_FILE})
 
 target_link_libraries(malama PRIVATE
-    Threads::Threads
+    malama_core
     ${wxWidgets_LIBRARIES}
-    Boost::boost
-    Boost::regex
-    Boost::cobalt
-    Boost::iostreams
-    Boost::context
-    pugixml
-    SQLite3::SQLite3
-    spdlog::spdlog
-    glaze::glaze
-    ${LibArchive_LIBRARIES}
-    ${POPPLER_CPP_LIBRARIES}
-    ${JPEG_LIBRARIES}
-    ${PNG_LIBRARIES}
 )
+
+# ---------------------------------------------------------------------------
+# Conditional Testing Engine Loading
+# ---------------------------------------------------------------------------
+if(BUILD_TESTING OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    add_subdirectory(tests)
+endif()
