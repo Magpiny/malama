@@ -1,0 +1,11 @@
+tests/
+├── CMakeLists.txt                  # Transitioned to modern FetchContent Catch2 v3
+├── main_test.cpp                   # Clean, fast Catch2 session entry point (no wx App loops)
+├── unit/                           # COMPONENT ISOLATION ZONE (v0.2.8-1 focus)
+│   ├── test_base64.cpp             # Mathematical vector encoder/decoder validation
+│   ├── test_mime_detector.cpp      # Binary header file signature pattern validation
+│   ├── test_attachment_bounds.cpp  # Ingestion file limit, sizing, and error routing checks
+│   └── test_context_enclosure.cpp  # System markdown tag boundary tracking ([START]/[END])
+├── integration/                    # Multi-Module Validation
+│   └── distro_matrix/              # Headless environment validations (Arch/Ubuntu/Fedora)
+└── stress/                         # Context filling and memory leak evaluation

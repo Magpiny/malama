@@ -103,6 +103,8 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
         cache["cpp"] = lang_cpp;
         cache["c++"] = lang_cpp;
 
+        cache["c"] = lang_cpp;
+
         // ---------------------------------------------------------------------
         // 2. Python Language Context
         // ---------------------------------------------------------------------
