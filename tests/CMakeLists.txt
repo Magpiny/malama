@@ -46,7 +46,7 @@ target_compile_options(malama_tests PRIVATE
 
 target_link_libraries(malama_tests PRIVATE
     malama_core
-    Catch2::Catch2WithMain
+    Catch2::Catch2
 )
 
 catch_discover_tests(malama_tests)
