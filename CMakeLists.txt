@@ -8,7 +8,7 @@
 # /////////////////////////////////////////////////////////////////////////////
 
 cmake_minimum_required(VERSION 3.28)
-project(malama VERSION 0.2.7 LANGUAGES CXX)
+project(malama VERSION 0.2.9 LANGUAGES CXX)
 
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
@@ -88,10 +88,18 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
 
 # ---------------------------------------------------------------------------
-# Target Specification: malama_core Static Library Subsystem
+#   Interactive System Dependency Checking Matrix Blocks
 # ---------------------------------------------------------------------------
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GLIB2 REQUIRED IMPORTED_TARGET glib-2.0)
+
+# ---------------------------------------------------------------------------
+# Target Specification: malama_core Static Library Subsystem
+# --------------------------------------------------------------------------
 add_library(malama_core STATIC
     src/config/config_manager.cpp
+    src/core/config_manager.cpp
+    src/core/install_validator.cpp
     src/engine/markdown/pipeline.cpp
     src/engine/markdown/syntax_registry.cpp # FIXED: Added missing domain component
     src/engine/storage/attachment_manager.cpp
@@ -133,7 +141,7 @@ add_executable(malama
     src/ui/chat_panel.cpp
     src/ui/error_banner.cpp
     src/ui/main_frame.cpp
-    src/ui/settings_dialog.cpp # FIXED: Added missing user interface modal layout
+    src/ui/settings_dialog.cpp
     src/ui/sidebar_panel.cpp
 )
 
@@ -142,6 +150,19 @@ include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE
     malama_core
     ${wxWidgets_LIBRARIES}
+    PkgConfig::GLIB2
+)
+
+# --------------------------------------------------------------------------------
+#   Adding icon to user to mainframe
+# --------------------------------------------------------------------------------
+# Add post-build command to automatically sync runtime assets to the build directory
+add_custom_command(
+    TARGET malama POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:malama>/assets"
+    COMMENT "Copying runtime asset files (ic_malama.jpeg) to build directory..."
 )
 
 # ---------------------------------------------------------------------------

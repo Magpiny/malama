@@ -57,6 +57,7 @@ inline constexpr std::string_view color_smoke_white = "#f5f5f7";      // Body te
 inline constexpr std::string_view color_muted_rose = "#c4929a";       // Headers and status labels
 inline constexpr std::string_view color_code_background = "#1a0105";  // Codeblock view terminal
 inline constexpr std::string_view color_dark_brown = "#3E2723";       // sidebar color //
+inline constexpr std::string_view color_dark_grey = "#282F31";        // sidebar color //
 
 // Button & Icon Styling Metrics
 inline constexpr int icon_button_margin = 4;

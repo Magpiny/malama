@@ -4,7 +4,7 @@
 
 # Malama
 
-***Malama is a lightweight, private, and fully native desktop interface for chatting  21with large language models running locally through Ollama.***
+***Malama is a lightweight, private, and fully native desktop interface for chatting  with large language models running locally through Ollama.***
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](#)

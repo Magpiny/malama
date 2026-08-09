@@ -21,6 +21,8 @@
 #include <wx/aboutdlg.h>
 #include <wx/event.h>
 #include <wx/hyperlink.h>
+#include <wx/image.h>
+#include <wx/imagjpeg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/stdpaths.h>
@@ -88,6 +90,56 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
 
     m_history_manager_ptr =
         std::make_unique<engine::storage::HistoryManager>(app_data_dir / "sessions");
+
+    /*  // Dynamic asset path resolution logic*/
+    const std::filesystem::path exe_dir =
+        std::filesystem::path(wxStandardPaths::Get().GetExecutablePath().ToStdString())
+            .parent_path();
+
+    const std::vector<std::filesystem::path> candidate_icon_paths = {
+        exe_dir / "assets" / "malama.jpg", exe_dir / "malama.jpg",
+        std::filesystem::path("../../assets/malama.jpg"),
+        std::filesystem::path((home_dir != nullptr) ? home_dir : "") / ".local" / "share" /
+            "icons" / "hicolor" / "scalable" / "apps" / "malama.svg"};
+
+    bool icon_loaded = false;
+    for (const auto &icon_file : candidate_icon_paths) {
+        if (std::filesystem::exists(icon_file)) {
+            wxIcon app_icon;
+            // Load via wxBitmap -> wxIcon for robust JPEG rendering on GTK window surfaces
+            wxBitmap icon_bmp;
+            if (icon_bmp.LoadFile(wxString::FromUTF8(icon_file.string()), wxBITMAP_TYPE_JPEG) &&
+                icon_bmp.IsOk()) {
+                app_icon.CopyFromBitmap(icon_bmp);
+                SetIcon(app_icon);
+                spdlog::info("Loaded application window icon from: {}", icon_file.string());
+                icon_loaded = true;
+                break;
+            }
+            if (app_icon.LoadFile(wxString::FromUTF8(icon_file.string()), wxBITMAP_TYPE_ANY)) {
+                SetIcon(app_icon);
+                spdlog::info("Loaded application window icon from: {}", icon_file.string());
+                icon_loaded = true;
+                break;
+            }
+        }
+    }
+
+    if (!icon_loaded) {
+        spdlog::warn("Could not locate or render ic_malama.jpeg across search paths.");
+    }
+
+    /* wxString iconPath = "../../assets/malama.jpg";*/
+    /*if (wxFileExists(iconPath)) {*/
+    /*wxIcon icon;*/
+    /*if (icon.LoadFile(iconPath, wxBITMAP_TYPE_JPEG)) {*/
+    /*SetIcon(icon);*/
+    /*} else {*/
+    /*spdlog::info("Failed to load icon from file in: ");*/
+    /*}*/
+    /*} else {*/
+    /*spdlog::info("Icon file not found in: ");*/
+    /*}*/
 
     setup_menu_bar();
     setup_workspace_layout();

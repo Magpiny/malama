@@ -97,7 +97,8 @@ class FragmentCache {
             evict_oldest();
         }
         m_order.push_back(key);
-        m_map.emplace(key, Entry{std::move(html), std::prev(m_order.end())});
+        m_map.emplace(key,
+                      Entry{.m_html = std::move(html), .m_order_it = std::prev(m_order.end())});
     }
 
    private:
@@ -567,10 +568,6 @@ void emit_rendered_cells(std::string &html_output, const std::vector<std::string
         trimmed.erase(std::ranges::find_if_not(std::views::reverse(trimmed), is_space).base(),
                       trimmed.end());
 
-        // Fixed: the previous version had a stray space inside the quotes
-        // (e.g. bgcolor=" #1a0105 "), which wxHtmlWindow's attribute parser
-        // does not tolerate for hex colors -- it silently fell back to the
-        // default color instead of applying the theme.
         if (row_idx == 0) {
             html_output += R"(<th bgcolor=")" + theme.m_surface_color + R"("><b><font color=")" +
                            theme.m_text_accent + R"(">)" + decorator(trimmed) +

@@ -39,7 +39,7 @@ inline constexpr int id_control_new_btn = 11004;
 SidebarPanel::SidebarPanel(wxWindow *parent_ptr,
                            engine::storage::HistoryManager *history_manager_ptr)
     : wxPanel(parent_ptr, wxID_ANY), m_history_manager_ptr(history_manager_ptr) {
-    SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+    SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
     setup_layout();
     bind_events();
 
@@ -70,7 +70,7 @@ void SidebarPanel::setup_layout() noexcept {
         delete sizer_ptr;
         return;
     }
-    m_new_chat_btn_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+    m_new_chat_btn_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
     m_new_chat_btn_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
 
     m_new_chat_btn_ptr->SetToolTip("Initialize a clean conversation workspace session");
@@ -84,7 +84,7 @@ void SidebarPanel::setup_layout() noexcept {
         delete sizer_ptr;
         return;
     }
-    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
 
     m_metrics_text_ptr = new (std::nothrow) wxStaticText(this, wxID_ANY, "");
     if (m_metrics_text_ptr == nullptr) {
@@ -165,7 +165,7 @@ void SidebarPanel::populate_sidebar() noexcept {
     m_history_list_ptr->Clear();
     m_active_metadata.clear();
 
-    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_brown)));
+    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
     m_history_list_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
 
     m_active_metadata = m_history_manager_ptr->LoadAllMetadata();
@@ -244,10 +244,10 @@ void SidebarPanel::on_context_menu(wxContextMenuEvent &WXUNUSED(event)) noexcept
     wxMenu context_menu;
     bool is_pinned = m_active_metadata[index_cast].m_is_pinned;
 
-    context_menu.Append(id_menu_toggle_pin, is_pinned ? "Unpin Session" : "Pin Session");
-    context_menu.Append(id_menu_rename, "Rename Session...");
+    context_menu.Append(id_menu_toggle_pin, is_pinned ? "Unpin Chat" : "Pin Chat");
+    context_menu.Append(id_menu_rename, "Rename Chat...");
     context_menu.AppendSeparator();
-    context_menu.Append(id_menu_delete, "Delete Session");
+    context_menu.Append(id_menu_delete, "Delete Chat");
 
     context_menu.Bind(
         wxEVT_MENU,

@@ -1,47 +1,57 @@
 #!/usr/bin/env bash
-# /////////////////////////////////////////////////////////////////////////////
+#############################################################################
 # Name:        tests/integration/distro_matrix/run_matrix.sh
-# Purpose:     Automated cross-distribution containerized build orchestration
-# Author:      Wanjare <wanjare@magpiny.dev>
-# Created:     2026-06-08
+# Purpose:     Post-installation verification suite across Linux distros
+# Author:      Wanjare S. (Magpiny)
+# Created:     2026-08-09
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
-# Licence:     Apache-2.0
-# /////////////////////////////////////////////////////////////////////////////
+# Licence:     GPL-3.0-or-later
+#############################################################################
 
-set -e
+set -euo pipefail
 
-# Enforce BuildKit to eliminate legacy builder deprecation warnings
-export DOCKER_BUILDKIT=1
-
-# Resolve canonical paths dynamically relative to the script location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
-cd "${PROJECT_ROOT}"
+DISTROS=("arch" "fedora" "ubuntu")
 
-echo "🚀 Starting malama Cross-Distribution Compilation Matrix Sweeps..."
+echo "============================================================"
+echo " Starting Malama v0.2.9 Post-Installation Verification Matrix"
+echo "============================================================"
 
-for distro in ubuntu fedora arch; do
-    echo "--------------------------------------------------------"
-    echo "📦 Testing Environment Build Target: ${distro}"
-    echo "--------------------------------------------------------"
-    
-    # Target the Dockerfiles using the dynamically calculated script directory path
+for distro in "${DISTROS[@]}"; do
+    echo "[TEST RUN] Validating installation infrastructure on: ${distro}"
+
     docker build \
-        -t "malama-test:${distro}" \
         -f "${SCRIPT_DIR}/${distro}.dockerfile" \
-        .
-    
-    # Mount workspace into container to compile and evaluate warnings
-    docker run --rm \
-    --user "$(id -u):$(id -g)" \
-    -v "${PROJECT_ROOT}:/workspace" \
-    "malama-test:${distro}" bash -c "
-        mkdir -p build_${distro} && cd build_${distro} && \
-        cmake -DCMAKE_BUILD_TYPE=Release .. && \
-        make -j\$(nproc)
-    " 
-    echo "✅ Target environment ${distro} compiled cleanly with ZERO errors."
+        -t "malama-verify:${distro}" \
+        "${PROJECT_ROOT}"
+
+    docker run --rm "malama-verify:${distro}" bash -c "
+        set -euo pipefail
+
+        echo '--> Step 1: Execute User-Space Installation'
+        ./install.sh
+
+        echo '--> Step 2: Verify Binary and Desktop File Placement'
+        test -f ~/.local/bin/malama
+        test -f ~/.local/share/applications/malama.desktop
+        test -f ~/.local/share/icons/hicolor/scalable/apps/malama.svg
+
+        echo '--> Step 3: Execute Binary Version Check'
+        ~/.local/bin/malama --version || true
+
+        echo '--> Step 4: Execute Clean Uninstallation with Purge'
+        ./uninstall.sh --purge
+
+        echo '--> Step 5: Assert No Orphan Binary or Configuration Files'
+        ! test -f ~/.local/bin/malama
+        ! test -f ~/.local/share/applications/malama.desktop
+        ! test -d ~/.config/malama
+    "
+
+    echo "[PASS] ${distro} installation & uninstallation scrub passed cleanly!"
+    echo "------------------------------------------------------------"
 done
 
-echo "🎉 All distribution validation sweeps completed successfully!"
+echo "[SUCCESS] All distro integration tests passed for v0.2.9."

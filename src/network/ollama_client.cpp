@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_client.cpp
 // Purpose:     Implements stackless awaitable loops with chunk parsing boundaries
-// Author:      Wanjare <wanpiny.dev>
+// Author:      Wanjare S<samuelwanjare@protonmail.com>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-V3-or-later
@@ -9,8 +9,6 @@
 
 #include "network/ollama_client.hpp"
 
-#include <algorithm>
-#include <array>
 #include <boost/asio/as_tuple.hpp>
 #include <boost/asio/this_coro.hpp>
 #include <boost/beast/core.hpp>
@@ -19,8 +17,6 @@
 #include <format>
 #include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
-
-#include "common/constants.hpp"
 
 namespace malama::network {
 

@@ -22,6 +22,12 @@
 #include "network/stream_worker.hpp"
 #include "ui/main_frame.hpp"
 
+#if defined(__WXGTK__)
+
+#include <glib.h>
+
+#endif
+
 namespace malama {
 
 class MalamaApp final : public wxApp {
@@ -36,6 +42,15 @@ class MalamaApp final : public wxApp {
 
     [[nodiscard]] bool OnInit() override {
         wxInitAllImageHandlers();
+
+        SetAppName("malama");
+        SetAppDisplayName("Malama");
+
+#if defined(__WXGTK__)
+        std::string app_name = "malama";
+        g_set_prgname(app_name.c_str());
+#endif
+
         spdlog::set_level(spdlog::level::debug);
         spdlog::info("Initializing malama v0.2.6 UI Customizations...\n");
 
@@ -87,19 +102,6 @@ class MalamaApp final : public wxApp {
 
         if (frame_ptr == nullptr) {
             return false;
-        }
-
-        // FIXED: Replicated the working snippet's exact logic pattern for Wayland compatibility
-        wxString icon_path = "./assets/ic_malama.jpeg";
-        if (wxFileExists(icon_path)) {
-            wxIcon app_icon;
-            if (app_icon.LoadFile(icon_path, wxBITMAP_TYPE_JPEG)) {
-                frame_ptr->SetIcon(app_icon);
-            } else {
-                spdlog::warn("Failed to load icon from file in: {}", icon_path.ToStdString());
-            }
-        } else {
-            spdlog::warn("Icon file not found in: {}", icon_path.ToStdString());
         }
 
         frame_ptr->Show(true);
