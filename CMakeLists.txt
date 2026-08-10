@@ -8,7 +8,7 @@
 # /////////////////////////////////////////////////////////////////////////////
 
 cmake_minimum_required(VERSION 3.28)
-project(malama VERSION 0.2.9 LANGUAGES CXX)
+project(malama VERSION 0.3.0 LANGUAGES CXX)
 
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
@@ -117,6 +117,8 @@ add_library(malama_core STATIC
     src/engine/storage/parsers/xml_parser.cpp
     src/network/ollama_client.cpp
     src/network/stream_worker.cpp
+    src/engine/export/export_engine.cpp 
+    src/engine/token/token_estimator.cpp
 )
 
 target_include_directories(malama_core PUBLIC include src libs)
@@ -162,7 +164,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/assets"
             "$<TARGET_FILE_DIR:malama>/assets"
-    COMMENT "Copying runtime asset files (ic_malama.jpeg) to build directory..."
+    COMMENT "Copying runtime asset files (malama.jpg) to build directory..."
 )
 
 # ---------------------------------------------------------------------------

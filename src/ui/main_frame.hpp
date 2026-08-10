@@ -53,8 +53,9 @@ class MainFrame final : public wxFrame {
     void setup_workspace_layout() noexcept;
     void bind_action_events() noexcept;
     void setup_menu_bar() noexcept;
+    void load_application_icon() noexcept;
 
-    // FIXED: Layout synchronization handler to dynamically apply colors and fonts
+    // Layout synchronization handler to dynamically apply colors and fonts
     void apply_appearance_settings() noexcept;
 
     // Event Handlers

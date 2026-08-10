@@ -1,14 +1,15 @@
-// /////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 // Name:        src/main.cpp
 // Purpose:     Main application entry point for malama native client
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
-// /////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <memory>
 #include <new>
 #include <spdlog/spdlog.h>
 #include <string>
@@ -23,9 +24,7 @@
 #include "ui/main_frame.hpp"
 
 #if defined(__WXGTK__)
-
 #include <glib.h>
-
 #endif
 
 namespace malama {
@@ -42,17 +41,21 @@ class MalamaApp final : public wxApp {
 
     [[nodiscard]] bool OnInit() override {
         wxInitAllImageHandlers();
-
         SetAppName("malama");
         SetAppDisplayName("Malama");
 
 #if defined(__WXGTK__)
-        std::string app_name = "malama";
-        g_set_prgname(app_name.c_str());
+        // Binds Wayland app surface to malama-dev.desktop
+        g_set_prgname("malama");
+#endif
+
+#if defined(__WXMSW__)
+        wxIcon icon(wxT("malama.jpg"), wxBITMAP_TYPE_JPEG);
+        SetIcon(icon);
 #endif
 
         spdlog::set_level(spdlog::level::debug);
-        spdlog::info("Initializing malama v0.2.6 UI Customizations...\n");
+        spdlog::info("Initializing malama v0.2.9 UI Customizations...\n");
 
         config::ConfigManager::get_instance().load_config("malama_config.json");
         const auto app_config = config::ConfigManager::get_instance().get_config();
@@ -70,6 +73,8 @@ class MalamaApp final : public wxApp {
         if (raw_worker_ptr == nullptr) {
             return false;
         }
+
+        // FIXED: Removed premature closing brace before this line
         m_worker_ptr.reset(raw_worker_ptr);
 
         auto *frame_ptr = new (std::nothrow) ui::MainFrame(

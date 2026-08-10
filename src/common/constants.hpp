@@ -71,4 +71,11 @@ inline constexpr int NETWORK_READ_TIMEOUT_SEC = 60;
 // Typewriter Rendering Parameters
 inline constexpr int typewriter_delay_timer_ms = 5;
 
+// AI tuning : Nice to have features
+inline constexpr float chat_temperature{0.7F};
+inline constexpr float top_p{0.9F};
+inline constexpr int top_k{40};
+inline constexpr float rpt_penalty{1.1F};
+inline constexpr uint32_t max_chat_length{16384};
+
 }  // namespace malama::constants
