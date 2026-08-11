@@ -53,7 +53,7 @@ jobs:
       - name: Install Packaging Prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libwxgtk3.2-dev libsqlite3-dev \
+          sudo apt-get install -y cmake ninja-build libwxgtk3.2-dev libspdlog-dev libsqlite3-dev \
             libpoppler-cpp-dev libarchive-dev libpugixml-dev libboost-all-dev wget
 
       - name: Build Release Binary
