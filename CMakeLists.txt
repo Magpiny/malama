@@ -8,7 +8,7 @@
 # /////////////////////////////////////////////////////////////////////////////
 
 cmake_minimum_required(VERSION 3.28)
-project(malama VERSION 0.2.7 LANGUAGES CXX)
+project(malama VERSION 0.3.0 LANGUAGES CXX)
 
 if(POLICY CMP0167)
     cmake_policy(SET CMP0167 NEW)
@@ -88,10 +88,18 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
 
 # ---------------------------------------------------------------------------
-# Target Specification: malama_core Static Library Subsystem
+#   Interactive System Dependency Checking Matrix Blocks
 # ---------------------------------------------------------------------------
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GLIB2 REQUIRED IMPORTED_TARGET glib-2.0)
+
+# ---------------------------------------------------------------------------
+# Target Specification: malama_core Static Library Subsystem
+# --------------------------------------------------------------------------
 add_library(malama_core STATIC
     src/config/config_manager.cpp
+    src/core/config_manager.cpp
+    src/core/install_validator.cpp
     src/engine/markdown/pipeline.cpp
     src/engine/markdown/syntax_registry.cpp # FIXED: Added missing domain component
     src/engine/storage/attachment_manager.cpp
@@ -109,6 +117,8 @@ add_library(malama_core STATIC
     src/engine/storage/parsers/xml_parser.cpp
     src/network/ollama_client.cpp
     src/network/stream_worker.cpp
+    src/engine/export/export_engine.cpp 
+    src/engine/token/token_estimator.cpp
 )
 
 target_include_directories(malama_core PUBLIC include src libs)
@@ -133,7 +143,7 @@ add_executable(malama
     src/ui/chat_panel.cpp
     src/ui/error_banner.cpp
     src/ui/main_frame.cpp
-    src/ui/settings_dialog.cpp # FIXED: Added missing user interface modal layout
+    src/ui/settings_dialog.cpp
     src/ui/sidebar_panel.cpp
 )
 
@@ -142,6 +152,19 @@ include(${wxWidgets_USE_FILE})
 target_link_libraries(malama PRIVATE
     malama_core
     ${wxWidgets_LIBRARIES}
+    PkgConfig::GLIB2
+)
+
+# --------------------------------------------------------------------------------
+#   Adding icon to user to mainframe
+# --------------------------------------------------------------------------------
+# Add post-build command to automatically sync runtime assets to the build directory
+add_custom_command(
+    TARGET malama POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:malama>/assets"
+    COMMENT "Copying runtime asset files (malama.jpg) to build directory..."
 )
 
 # ---------------------------------------------------------------------------
@@ -149,4 +172,32 @@ target_link_libraries(malama PRIVATE
 # ---------------------------------------------------------------------------
 if(BUILD_TESTING OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     add_subdirectory(tests)
+endif()
+
+
+# ---------------------------------------------------------------------------
+# Desktop Entry & Icon Asset Configurations
+# ---------------------------------------------------------------------------
+include(GNUInstallDirs)
+
+# Configure malama.desktop in build directory for development/testing
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/malama.desktop.in"
+    "${CMAKE_BINARY_DIR}/malama.desktop"
+    @ONLY
+)
+
+# Install rules for production deployment (make install)
+install(TARGETS malama
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(FILES "${CMAKE_BINARY_DIR}/malama.desktop"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/malama.png")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/malama.png"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
+    )
 endif()

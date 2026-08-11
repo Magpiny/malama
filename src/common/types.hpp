@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/common/types.hpp
 // Purpose:     Core type definitions and scoped error matrices for malama
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare <samuelwanjare@protonmail.com>
 // Created:     2026-06-06
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -9,7 +9,7 @@
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <cstdint>
 #include <string>
@@ -60,6 +60,29 @@ struct AppSettings {
     std::string m_fallback_model{constants::fallback_model_name};
     std::size_t m_context_window_limit{constants::default_context_window_limit};
     bool m_stream_tokens{true};
+};
+
+struct ModelParameters {
+    float m_temperature = constants::chat_temperature;
+    float m_top_p = constants::top_p;
+    int32_t m_top_k = constants::top_k;
+    float m_repeat_penalty = constants::rpt_penalty;
+    uint32_t m_num_ctx = constants::max_chat_length;
+    std::string m_system_prompt;
+};
+
+struct SessionMetadata {
+    std::string m_session_id;
+    std::string m_title;
+    uint64_t m_created_at{0};
+    uint64_t m_updated_at{0};
+    bool m_is_pinned{false};
+    ModelParameters m_parameters{};
+};
+
+struct ChatSession {
+    SessionMetadata m_metadata{};
+    std::vector<Message> m_messages;
 };
 
 }  // namespace malama::common

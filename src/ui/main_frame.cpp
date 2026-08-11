@@ -19,8 +19,13 @@
 #include <spdlog/spdlog.h>
 #include <string>
 #include <wx/aboutdlg.h>
+#include <wx/bitmap.h>
 #include <wx/event.h>
+#include <wx/filename.h>
 #include <wx/hyperlink.h>
+#include <wx/icon.h>
+#include <wx/image.h>
+#include <wx/imagjpeg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/stdpaths.h>
@@ -95,6 +100,48 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
 
     apply_appearance_settings();
     LoadMostRecentSessionOnStartup();
+}
+
+void MainFrame::load_application_icon() noexcept {
+    namespace fs = std::filesystem;
+
+    // 1. Get executable directory using standard UTF-8 string on Linux
+    const std::string exe_full_path = wxStandardPaths::Get().GetExecutablePath().ToStdString();
+    const fs::path exe_dir = fs::path(exe_full_path).parent_path();
+
+    // 2. Search candidate locations (build directory & assets)
+    const std::vector<fs::path> candidate_paths = {
+        exe_dir / "assets" / "malama.png", exe_dir / "assets" / "malama.png",
+        exe_dir / "malama.png", fs::path("./assets/malama.png")};
+
+    fs::path target_image_path;
+    for (const auto &candidate : candidate_paths) {
+        if (fs::exists(candidate)) {
+            target_image_path = candidate;
+            break;
+        }
+    }
+
+    if (target_image_path.empty()) {
+        spdlog::warn("Icon file not found in build assets. Checked path: {}",
+                     (exe_dir / "assets").string());
+        return;
+    }
+
+    // 3. Load via wxImage (Requires wxInitAllImageHandlers() in wxApp::OnInit)
+    wxImage logo_image;
+    if (logo_image.LoadFile(wxString::FromUTF8(target_image_path.string()), wxBITMAP_TYPE_PNG) &&
+        logo_image.IsOk()) {
+        // Convert wxImage -> wxBitmap -> wxIcon
+        wxBitmap logo_bitmap(logo_image);
+        wxIcon app_icon;
+        app_icon.CopyFromBitmap(logo_bitmap);
+
+        SetIcon(app_icon);
+        spdlog::info("Successfully loaded frame icon from: {}", target_image_path.string());
+    } else {
+        spdlog::error("Failed to decode JPEG image buffer at: {}", target_image_path.string());
+    }
 }
 
 auto MainFrame::AppendUserMessage(std::string_view message) noexcept -> void {

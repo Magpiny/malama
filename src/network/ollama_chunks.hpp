@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_chunks.hpp
 // Purpose:     Glaze JSON schema definitions for Ollama API streaming frames
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S<samuelwanjare@protonmail.com>
 // Created:     2026-06-09
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3-or-later

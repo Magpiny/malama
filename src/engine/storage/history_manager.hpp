@@ -44,6 +44,8 @@ class HistoryManager final {
     auto UpdateSessionTitle(const std::string &session_id, const std::string &new_title) -> void;
     auto ToggleSessionPin(const std::string &session_id) -> void;
     auto ToggleMessageStar(const std::string &session_id, const std::string &message_id) -> void;
+    auto UpdateSessionParameters(const std::string &session_id, const core::ModelParameters &params)
+        -> void;
 
     // Data Retrieval Pipelines
     [[nodiscard]] auto LoadAllMetadata() const -> std::vector<core::SessionMetadata>;

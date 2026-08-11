@@ -37,7 +37,7 @@ class SyntaxRegistry final {
     SyntaxRegistry();
     ~SyntaxRegistry() = default;
 
-    auto LoadFromJson(const std::string &filepath) -> bool;
+    static auto LoadFromJson(const std::string &filepath) -> bool;
 
     [[nodiscard]] auto GetSyntaxFor(const std::string &lang_id) const noexcept
         -> const LanguageSyntax *;

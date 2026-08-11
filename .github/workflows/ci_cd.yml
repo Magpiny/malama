@@ -1,0 +1,74 @@
+name: Malama v0.3.0 Continuous Integration & Deployment
+
+on:
+  push:
+    branches: [ main, release/* ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    name: Build & Test (Ubuntu 22.04 LTS baseline)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libwxgtk3.2-dev sqlite3 libsqlite3-dev \
+            libpoppler-cpp-dev libarchive-dev libpugixml-dev \
+            libpng-dev libjpeg-dev libboost-all-dev
+
+      - name: Configure CMake
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=ON
+
+      - name: Build Targets
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Execute Offline Test Suite
+        run: |
+          ctest --test-dir build --output-on-failure
+
+  package-appimage:
+    name: AppImage Assembly & Release Deployment
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Packaging Prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build libwxgtk3.2-dev libsqlite3-dev \
+            libpoppler-cpp-dev libarchive-dev libpugixml-dev libboost-all-dev wget
+
+      - name: Build Release Binary
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target malama --parallel $(nproc)
+
+      - name: Build AppImage Bundle
+        run: |
+          chmod +x scripts/build_appimage.sh
+          ./scripts/build_appimage.sh
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: Malama-v0.3.0-x86_64.AppImage
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

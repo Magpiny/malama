@@ -199,7 +199,7 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
         LanguageSyntax lang_html;
         lang_html.m_name = "html";
 
-        std::string pat_html_comment = R"()";
+        std::string pat_html_comment;
         lang_html.m_rules.push_back(SyntaxRule{.m_pattern_string = pat_html_comment,
                                                .m_compiled_pattern = boost::regex(pat_html_comment),
                                                .m_replacement_format = "\x03$1\x04"});

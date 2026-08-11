@@ -4,12 +4,12 @@
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-06-06
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-later
 
 #include <cstdint>
 #include <string_view>
@@ -57,6 +57,7 @@ inline constexpr std::string_view color_smoke_white = "#f5f5f7";      // Body te
 inline constexpr std::string_view color_muted_rose = "#c4929a";       // Headers and status labels
 inline constexpr std::string_view color_code_background = "#1a0105";  // Codeblock view terminal
 inline constexpr std::string_view color_dark_brown = "#3E2723";       // sidebar color //
+inline constexpr std::string_view color_dark_grey = "#282F31";        // sidebar color //
 
 // Button & Icon Styling Metrics
 inline constexpr int icon_button_margin = 4;
@@ -69,5 +70,12 @@ inline constexpr int NETWORK_READ_TIMEOUT_SEC = 60;
 
 // Typewriter Rendering Parameters
 inline constexpr int typewriter_delay_timer_ms = 5;
+
+// AI tuning : Nice to have features
+inline constexpr float chat_temperature{0.7F};
+inline constexpr float top_p{0.9F};
+inline constexpr int top_k{40};
+inline constexpr float rpt_penalty{1.1F};
+inline constexpr uint32_t max_chat_length{16384};
 
 }  // namespace malama::constants

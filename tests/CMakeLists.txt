@@ -35,6 +35,10 @@ add_executable(malama_tests
     unit/test_mime_detector.cpp
     unit/test_attachment_bounds.cpp
     unit/test_context_enclosure.cpp
+    unit/test_install_validator.cpp
+    unit/test_v030_subsystems.cpp 
+    stress/test_stream_performance.cpp
+    integration/test_system_e2e.cpp
 )
 
 target_compile_features(malama_tests PRIVATE cxx_std_23)
