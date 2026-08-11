@@ -9,8 +9,8 @@ on:
 
 jobs:
   build-test:
-    name: Build & Test (Ubuntu 22.04 LTS baseline)
-    runs-on: ubuntu-22.04
+    name: Build & Test (Ubuntu 24.04 LTS baseline)
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout Code
@@ -44,7 +44,7 @@ jobs:
     name: AppImage Assembly & Release Deployment
     needs: build-test
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout Code
