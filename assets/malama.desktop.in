@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Malama
+Comment=Lightweight native Linux interface for local LLMs via Ollama
+Exec=malama %U
+Icon=malama
+Terminal=false
+Type=Application
+Categories=Utility;Development;ArtificialIntelligence;
+X-AppImage-Version=0.3.0
+X-AppImage-Name=Malama
+StartupWMClass=malama

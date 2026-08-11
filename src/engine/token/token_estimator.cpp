@@ -14,13 +14,14 @@
 #include <cmath>
 
 namespace malama::engine::token {
+inline constexpr float chars_per_token = 3.0F;
 
 [[nodiscard]] uint32_t TokenEstimator::estimate_text_tokens(std::string_view text) noexcept {
     if (text.empty()) {
         return 0;
     }
-    // Heuristic estimation (~3.8 character count per token for text/code)
-    return static_cast<uint32_t>(std::ceil(static_cast<float>(text.size()) / 3.8F));
+    // Conservative estimation: 1 token ≈ 3 characters for code and structured prompt blocks
+    return static_cast<uint32_t>(std::ceil(static_cast<float>(text.size()) / chars_per_token));
 }
 
 [[nodiscard]] TokenBudgetStatus TokenEstimator::calculate_budget(

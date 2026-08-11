@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.magpiny.malama</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Malama</name>
+  <summary>Lightweight, native Linux GTK/wxWidgets desktop UI for local Ollama models</summary>
+  
+  <description>
+    <p>
+      Malama is a native Linux LLM chat frontend written in C++23 and wxWidgets.
+      It communicates directly with local Ollama instances with low RAM footprint compared to its peers.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">malama.desktop</launchable>
+  
+  <url type="homepage">https://github.com/Magpiny/malama</url>
+  <url type="bugtracker">https://github.com/Magpiny/malama/issues</url>
+  <url type="vcs-browser">https://github.com/Magpiny/malama</url>
+
+  <releases>
+    <release version="0.3.0" date="2026-08-12"/>
+  </releases>
+</component>

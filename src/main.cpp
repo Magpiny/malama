@@ -50,7 +50,7 @@ class MalamaApp final : public wxApp {
 #endif
 
 #if defined(__WXMSW__)
-        wxIcon icon(wxT("malama.jpg"), wxBITMAP_TYPE_JPEG);
+        wxIcon icon(wxT("malama.png"), wxBITMAP_TYPE_PNG);
         SetIcon(icon);
 #endif
 

@@ -1,13 +1,15 @@
 /////////////////////////////////////////////////////////////////////////////
 // Name:        include/engine/token/token_estimator.hpp
 // Purpose:     Fast pre-flight context budget and attachment token estimator
-// Author:      Wanjare S. (Magpiny)
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-08-10
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <cstdint>
 #include <string_view>

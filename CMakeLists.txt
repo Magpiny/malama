@@ -173,3 +173,31 @@ add_custom_command(
 if(BUILD_TESTING OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     add_subdirectory(tests)
 endif()
+
+
+# ---------------------------------------------------------------------------
+# Desktop Entry & Icon Asset Configurations
+# ---------------------------------------------------------------------------
+include(GNUInstallDirs)
+
+# Configure malama.desktop in build directory for development/testing
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/assets/malama.desktop.in"
+    "${CMAKE_BINARY_DIR}/malama.desktop"
+    @ONLY
+)
+
+# Install rules for production deployment (make install)
+install(TARGETS malama
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+install(FILES "${CMAKE_BINARY_DIR}/malama.desktop"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/malama.png")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/malama.png"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps"
+    )
+endif()

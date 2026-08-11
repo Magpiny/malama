@@ -7,4 +7,8 @@ build_fedora
 build_ubuntu
 malama_config.json
 compile_commands.json
+AppDir
+Malama-0.3.0-x86_64.AppImage
+Malama-0.3.0-x86_64.AppImage.zsync
+linuxdeploy-x86_64.AppImage
 
