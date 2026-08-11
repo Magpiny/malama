@@ -80,7 +80,7 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
     GIT_SUBMODULES_RECURSE TRUE
 )
-set(BOOST_INCLUDE_LIBRARIES cobalt asio)
+set(BOOST_INCLUDE_LIBRARIES cobalt asio uuid)
 set(BOOST_ENABLE_CMAKE ON)
 FetchContent_MakeAvailable(Boost)
 
