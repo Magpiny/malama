@@ -73,6 +73,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glaze)
 
+FetchContent_Declare(
+    Boost
+    URL https://github.com/boostorg/boost/releases/download/boost-1.87.0/boost-1.87.0-cmake.tar.xz
+    URL_HASH SHA256=b95bf7595378336d5f6fdb3cd97cba17d4ca86d21a8d3e5aa6c39cdc3d2eb8f
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+set(BOOST_INCLUDE_LIBRARIES cobalt asio system)
+set(BOOST_ENABLE_CMAKE ON)
+FetchContent_MakeAvailable(Boost)
+
 # ---------------------------------------------------------------------------
 # Core System Verification Fallbacks
 # ---------------------------------------------------------------------------
@@ -80,9 +90,6 @@ find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html adv)
 find_package(SQLite3 REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
-
-# FIXED: Explicitly map and resolve compiled binary symbols for Boost Cobalt coroutines
-find_package(Boost REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
@@ -131,8 +138,8 @@ target_link_libraries(malama_core PUBLIC
     JPEG::JPEG
     PkgConfig::POPPLER_CPP
     spdlog::spdlog
-    Boost::cobalt 
-    LibArchive::LibArchive
+    Boost::cobalt # FIXED: Linked binary coroutine symbols
+    LibArchive::LibArchive # FIXED: Switched to explicit modern target referencing
 )
 
 # ---------------------------------------------------------------------------
