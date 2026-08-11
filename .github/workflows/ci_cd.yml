@@ -25,7 +25,8 @@ jobs:
             build-essential cmake ninja-build pkg-config \
             libwxgtk3.2-dev sqlite3 libsqlite3-dev \
             libpoppler-cpp-dev libarchive-dev libpugixml-dev \
-            libpng-dev libjpeg-dev libspdlog-dev libboost-all-dev
+            libpng-dev libjpeg-dev libspdlog-dev \
+            libboost-all-dev libboost-cobalt-dev
 
       - name: Configure CMake
         run: |
@@ -53,8 +54,12 @@ jobs:
       - name: Install Packaging Prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build libwxgtk3.2-dev libspdlog-dev libsqlite3-dev \
-            libpoppler-cpp-dev libarchive-dev libpugixml-dev libboost-all-dev wget
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libwxgtk3.2-dev sqlite3 libsqlite3-dev \
+            libpoppler-cpp-dev libarchive-dev libpugixml-dev \
+            libpng-dev libjpeg-dev libspdlog-dev \
+            libboost-all-dev libboost-cobalt-dev wget
 
       - name: Build Release Binary
         run: |
@@ -69,6 +74,6 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: Malama-v0.3.0-x86_64.AppImage
+          files: Malama-v*-x86_64.AppImage
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
