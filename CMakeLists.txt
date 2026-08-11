@@ -80,7 +80,7 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE
     GIT_SUBMODULES_RECURSE TRUE
 )
-set(BOOST_INCLUDE_LIBRARIES cobalt cobalt_io asio)
+set(BOOST_INCLUDE_LIBRARIES cobalt asio)
 set(BOOST_ENABLE_CMAKE ON)
 FetchContent_MakeAvailable(Boost)
 
@@ -140,7 +140,6 @@ target_link_libraries(malama_core PUBLIC
     PkgConfig::POPPLER_CPP
     spdlog::spdlog
     Boost::cobalt
-    Boost::cobalt_io
     LibArchive::LibArchive
 )
 
