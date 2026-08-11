@@ -82,7 +82,7 @@ find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
 
 # FIXED: Explicitly map and resolve compiled binary symbols for Boost Cobalt coroutines
-find_package(Boost REQUIRED COMPONENTS context system)
+find_package(Boost REQUIRED)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
@@ -131,8 +131,8 @@ target_link_libraries(malama_core PUBLIC
     JPEG::JPEG
     PkgConfig::POPPLER_CPP
     spdlog::spdlog
-    Boost::cobalt # FIXED: Linked binary coroutine symbols
-    LibArchive::LibArchive # FIXED: Switched to explicit modern target referencing
+    Boost::cobalt 
+    LibArchive::LibArchive
 )
 
 # ---------------------------------------------------------------------------
