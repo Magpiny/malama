@@ -82,7 +82,7 @@ find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
 
 # FIXED: Explicitly map and resolve compiled binary symbols for Boost Cobalt coroutines
-find_package(Boost REQUIRED COMPONENTS cobalt)
+find_package(Boost REQUIRED COMPONENTS context system)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
