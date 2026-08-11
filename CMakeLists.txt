@@ -75,11 +75,12 @@ FetchContent_MakeAvailable(glaze)
 
 FetchContent_Declare(
     Boost
-    URL https://github.com/boostorg/boost/releases/download/boost-1.87.0/boost-1.87.0-cmake.tar.xz
-    URL_HASH SHA256=b95bf7595378336d5f6fdb3cd97cba17d4ca86d21a8d3e5aa6c39cdc3d2eb8f
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+    GIT_REPOSITORY https://github.com/boostorg/boost.git
+    GIT_TAG boost-1.91.0
+    GIT_SHALLOW TRUE
+    GIT_SUBMODULES_RECURSE TRUE
 )
-set(BOOST_INCLUDE_LIBRARIES cobalt asio system)
+set(BOOST_INCLUDE_LIBRARIES cobalt cobalt_io asio)
 set(BOOST_ENABLE_CMAKE ON)
 FetchContent_MakeAvailable(Boost)
 
@@ -138,8 +139,9 @@ target_link_libraries(malama_core PUBLIC
     JPEG::JPEG
     PkgConfig::POPPLER_CPP
     spdlog::spdlog
-    Boost::cobalt # FIXED: Linked binary coroutine symbols
-    LibArchive::LibArchive # FIXED: Switched to explicit modern target referencing
+    Boost::cobalt
+    Boost::cobalt_io
+    LibArchive::LibArchive
 )
 
 # ---------------------------------------------------------------------------
