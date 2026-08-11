@@ -25,7 +25,7 @@ jobs:
             build-essential cmake ninja-build pkg-config \
             libwxgtk3.2-dev sqlite3 libsqlite3-dev \
             libpoppler-cpp-dev libarchive-dev libpugixml-dev \
-            libpng-dev libjpeg-dev libboost-all-dev
+            libpng-dev libjpeg-dev libspdlog-dev libboost-all-dev
 
       - name: Configure CMake
         run: |
