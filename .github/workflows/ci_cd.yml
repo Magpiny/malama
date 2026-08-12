@@ -20,7 +20,7 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm \
             git cmake ninja pkgconf gcc \
-            wxwidgets-gtk3 sqlite poppler-cpp \
+            wxwidgets-gtk3 sqlite poppler \
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs
 
@@ -56,7 +56,7 @@ jobs:
           pacman -Syu --noconfirm
           pacman -S --noconfirm \
             git cmake ninja pkgconf gcc \
-            wxwidgets-gtk3 sqlite poppler-cpp \
+            wxwidgets-gtk3 sqlite poppler \
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs wget file
 
