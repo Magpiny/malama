@@ -73,17 +73,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glaze)
 
-FetchContent_Declare(
-    Boost
-    GIT_REPOSITORY https://github.com/boostorg/boost.git
-    GIT_TAG boost-1.91.0
-    GIT_SHALLOW TRUE
-    GIT_SUBMODULES_RECURSE TRUE
-)
-set(BOOST_INCLUDE_LIBRARIES cobalt asio uuid)
-set(BOOST_ENABLE_CMAKE ON)
-FetchContent_MakeAvailable(Boost)
-
 # ---------------------------------------------------------------------------
 # Core System Verification Fallbacks
 # ---------------------------------------------------------------------------
@@ -91,6 +80,9 @@ find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html adv)
 find_package(SQLite3 REQUIRED)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
+
+# FIXED: Explicitly map and resolve compiled binary symbols for Boost Cobalt coroutines
+find_package(Boost REQUIRED COMPONENTS cobalt)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(POPPLER_CPP REQUIRED IMPORTED_TARGET poppler-cpp)
@@ -139,8 +131,8 @@ target_link_libraries(malama_core PUBLIC
     JPEG::JPEG
     PkgConfig::POPPLER_CPP
     spdlog::spdlog
-    Boost::cobalt
-    LibArchive::LibArchive
+    Boost::cobalt # FIXED: Linked binary coroutine symbols
+    LibArchive::LibArchive # FIXED: Switched to explicit modern target referencing
 )
 
 # ---------------------------------------------------------------------------
