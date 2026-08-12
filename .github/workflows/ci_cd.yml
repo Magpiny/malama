@@ -71,6 +71,8 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: Malama-v*-x86_64.AppImage
+          files: |
+            Malama-v*-x86_64.AppImage
+            Malama-v*-x86_64.AppImage.zsync
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
