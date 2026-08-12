@@ -7,20 +7,20 @@
 # Copyright:   (c) 2026 Magpiny. All rights reserved.
 # Licence:     GPL-3.0-or-later
 #############################################################################
-
 # SPDX-License-Identifier: GPL-3.0-or-later
-
 set -euo pipefail
+
+# 0. Force FUSE-free extraction mode — required inside containers/CI
+#    where FUSE is unavailable (e.g. GitHub Actions `container:` jobs).
+#    Honored by both linuxdeploy and any appimagetool it invokes internally.
+export APPIMAGE_EXTRACT_AND_RUN=1
 
 # 1. Dynamically extract project version from CMakeLists.txt
 VERSION=$(grep -oP 'project\(malama VERSION \K[0-9.]+' CMakeLists.txt || echo "0.2.9")
 export VERSION
-
 # 2. Configure update information header
 export UPDATE_INFORMATION="gh-releases-zsync|magpiny|malama|latest|Malama-*-x86_64.AppImage.zsync"
-
 echo "🔵 [ℹ️ INFO] => Building Malama AppImage v${VERSION}..."
-
 # 3. Ensure linuxdeploy-x86_64.AppImage is present
 if [ ! -f "linuxdeploy-x86_64.AppImage" ]; then
     echo "🔵 [ℹ️ INFO] => linuxdeploy tool not found in project root. Fetching tool..."
@@ -34,20 +34,16 @@ if [ ! -f "linuxdeploy-x86_64.AppImage" ]; then
     fi
     chmod +x linuxdeploy-x86_64.AppImage
 fi
-
 # 4. Perform release build
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --config Release -j$(nproc)
-
 # 5. Assemble AppDir structure
 APP_DIR="AppDir"
 rm -rf "${APP_DIR}"
-
 mkdir -p "${APP_DIR}/usr/bin"
 mkdir -p "${APP_DIR}/usr/share/applications"
 mkdir -p "${APP_DIR}/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "${APP_DIR}/usr/share/metainfo"
-
 # Convert icon to PNG format if only JPG exists
 if [ -f "assets/malama.jpg" ] && [ ! -f "assets/malama.png" ]; then
     echo "🔵 [ℹ️ INFO] => Converting assets/malama.jpg to PNG format..."
@@ -57,19 +53,15 @@ if [ -f "assets/malama.jpg" ] && [ ! -f "assets/malama.png" ]; then
         ffmpeg -y -i assets/malama.jpg assets/malama.png
     fi
 fi
-
 # Copy binary and CMake-configured desktop file into AppDir
 cp build/malama "${APP_DIR}/usr/bin/malama"
 cp build/malama.desktop "${APP_DIR}/usr/share/applications/malama.desktop"
 cp assets/malama.png "${APP_DIR}/usr/share/icons/hicolor/256x256/apps/malama.png" 2>/dev/null || true
-
 if [ -f "assets/org.magpiny.malama.metainfo.xml" ]; then
     cp assets/org.magpiny.malama.metainfo.xml "${APP_DIR}/usr/share/metainfo/"
 fi
-
 # Sanitize Exec entry inside AppDir desktop file
 sed -i 's|^Exec=.*|Exec=malama %U|g' "${APP_DIR}/usr/share/applications/malama.desktop"
-
 # 6. Execute linuxdeploy to assemble AppImage
 ./linuxdeploy-x86_64.AppImage \
     --appdir "${APP_DIR}" \
@@ -77,7 +69,6 @@ sed -i 's|^Exec=.*|Exec=malama %U|g' "${APP_DIR}/usr/share/applications/malama.d
     --desktop-file "${APP_DIR}/usr/share/applications/malama.desktop" \
     --icon-file "${APP_DIR}/usr/share/icons/hicolor/256x256/apps/malama.png" \
     --output appimage
-
 # Handle desktop file naming case variations output by linuxdeploy
 GENERATED_APPIMAGE=$(ls malama-*.AppImage Malama-*.AppImage 2>/dev/null | head -n 1)
 if [ -n "${GENERATED_APPIMAGE}" ]; then
