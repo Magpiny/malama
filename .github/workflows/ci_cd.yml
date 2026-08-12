@@ -1,4 +1,6 @@
 name: Malama Continuous Integration & Deployment (Arch Linux)
+permissions:
+  contents: write
 
 on:
   push:
