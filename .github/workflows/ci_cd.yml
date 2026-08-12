@@ -1,4 +1,4 @@
-name: Malama v0.3.0 Continuous Integration & Deployment
+name: Malama Continuous Integration & Deployment (Arch Linux)
 
 on:
   push:
@@ -9,24 +9,25 @@ on:
 
 jobs:
   build-test:
-    name: Build & Test (Ubuntu 26.04 LTS baseline)
-    runs-on: ubuntu-26.04
+    name: Build & Test (Arch Linux baseline)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
 
     steps:
+      - name: Initialize Arch Environment & Install Dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            git cmake ninja pkgconf gcc \
+            wxwidgets-gtk3 sqlite poppler-cpp \
+            libarchive pugixml libpng libjpeg-turbo \
+            spdlog boost boost-libs
+
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential cmake ninja-build pkg-config \
-            libwxgtk3.2-dev sqlite3 libsqlite3-dev \
-            libpoppler-cpp-dev libarchive-dev libpugixml-dev \
-            libpng-dev libjpeg-dev libspdlog-dev \
-            libglib2.0-dev
 
       - name: Configure CMake
         run: |
@@ -45,21 +46,22 @@ jobs:
     name: AppImage Assembly & Release Deployment
     needs: build-test
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-26.04
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
 
     steps:
+      - name: Initialize Arch Environment & Install Prerequisites
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            git cmake ninja pkgconf gcc \
+            wxwidgets-gtk3 sqlite poppler-cpp \
+            libarchive pugixml libpng libjpeg-turbo \
+            spdlog boost boost-libs wget file
+
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Install Packaging Prerequisites
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential cmake ninja-build pkg-config \
-            libwxgtk3.2-dev sqlite3 libsqlite3-dev \
-            libpoppler-cpp-dev libarchive-dev libpugixml-dev \
-            libpng-dev libjpeg-dev libspdlog-dev \
-            wget libglib2.0-dev
 
       - name: Build Release Binary
         run: |
