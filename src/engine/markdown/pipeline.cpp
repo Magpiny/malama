@@ -6,10 +6,10 @@
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-01
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "engine/markdown/pipeline.hpp"
 
@@ -18,6 +18,7 @@
 #include <boost/regex.hpp>
 #include <cctype>
 #include <cstdint>
+#include <functional>
 #include <list>
 #include <mutex>
 #include <optional>
@@ -38,7 +39,7 @@ constexpr size_t structural_zero_index = 0;
 constexpr size_t minimum_valid_table_rows = 2;
 constexpr size_t minimum_divider_length = 3;
 
-constexpr std::string_view break_line_marker = "<br>";
+constexpr std::string_view break_line_marker = "\n";
 constexpr std::string_view spaces_accumulation = " ";
 constexpr std::string_view horizontal_rule_tag = "<hr>";
 constexpr std::string_view paragraph_start_tag = "<p>";
@@ -47,10 +48,12 @@ constexpr std::string_view unordered_list_tag = "ul";
 constexpr std::string_view ordered_list_tag = "ol";
 constexpr std::string_view header_1_size = "+2";
 constexpr std::string_view header_2_size = "+1";
-constexpr std::string_view header_3_size{};
-constexpr std::string_view header_4_size{};
+constexpr std::string_view header_3_size = "+0";
+constexpr std::string_view header_4_size = "-1";
 
 constexpr std::string_view fence_tag = "```";
+constexpr std::string_view head_6_tag = "###### ";
+constexpr std::string_view head_5_tag = "##### ";
 constexpr std::string_view head_4_tag = "#### ";
 constexpr std::string_view head_3_tag = "### ";
 constexpr std::string_view head_2_tag = "## ";
@@ -61,19 +64,6 @@ constexpr std::string_view list_dash_tag = "- ";
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Fragment cache: keyed by a hash of (token content + language + active
-// theme), storing the already-decorated HTML for that exact input. This is a
-// translation-unit-local detail -- Pipeline's public interface in the header
-// is untouched. It exists because decorate_inline_text/decorate_code_block
-// are regex-heavy, and chat_panel.cpp re-runs the whole markdown pipeline
-// over the full conversation history on every render; without this cache,
-// every historical header/paragraph/code-block gets fully re-decorated on
-// every token, which is the dominant cost in long conversations.
-//
-// Bounded to `max_entries` with simple LRU eviction so memory use cannot grow
-// without limit over a long-running session -- consistent with the low
-// memory footprint goal for this project.
 class FragmentCache {
    public:
     static constexpr std::size_t max_entries = 512;
@@ -140,8 +130,6 @@ class FragmentCache {
 inline constexpr std::size_t fnv_offset_basis = 14695981039346656037ULL;
 inline constexpr std::size_t fnv_prime = 1099511628211ULL;
 
-// FNV-1a. Fast, deterministic, adequate as a cache key -- not used for any
-// security-sensitive purpose, so no cryptographic hash is needed here.
 [[nodiscard]] auto hash_with_seed(std::string_view text, std::size_t seed) noexcept -> std::size_t {
     std::size_t hash_value = seed;
     for (const char byte_char : text) {
@@ -152,9 +140,6 @@ inline constexpr std::size_t fnv_prime = 1099511628211ULL;
     return hash_value;
 }
 
-// Cheap fingerprint of the theme fields that actually affect decoration
-// output, used so a theme switch correctly invalidates cached fragments
-// instead of serving stale colors.
 [[nodiscard]] auto theme_fingerprint(const config::AppearanceConfig &theme) -> std::string {
     std::string fingerprint;
     fingerprint += theme.m_code_string;
@@ -170,12 +155,6 @@ inline constexpr std::size_t fnv_prime = 1099511628211ULL;
 }
 
 [[nodiscard]] auto is_divider_line(std::string_view line) noexcept -> bool {
-    // CommonMark requires a thematic break to consist ONLY of the marker
-    // character (plus optional spaces, which chat content won't have here).
-    // The previous x3::lit("---") check matched as soon as it saw the first
-    // three dashes and silently discarded whatever followed on the same
-    // line -- e.g. "---not actually a divider" lost everything after the
-    // dashes. Requiring the whole line to be dashes fixes that data loss.
     if (line.size() < local_constants::minimum_divider_length) {
         return false;
     }
@@ -197,6 +176,50 @@ inline constexpr std::size_t fnv_prime = 1099511628211ULL;
     }
     prefix_length = digit_count + 2;
     return true;
+}
+
+[[nodiscard]] auto has_table_pipe(std::string_view line) noexcept -> bool {
+    std::string_view trimmed = line;
+    while (!trimmed.empty() && std::isspace(static_cast<unsigned char>(trimmed.front())) != 0) {
+        trimmed.remove_prefix(1);
+    }
+    if (trimmed.empty()) {
+        return false;
+    }
+    for (std::size_t char_idx = 0; char_idx < trimmed.size(); ++char_idx) {
+        if (trimmed[char_idx] == '|' && (char_idx == 0 || trimmed[char_idx - 1] != '\\')) {
+            return true;
+        }
+    }
+    return false;
+}
+
+[[nodiscard]] auto is_valid_delimiter_cell(std::string_view cell_content) noexcept -> bool {
+    std::string_view cell = cell_content;
+    while (!cell.empty() && std::isspace(static_cast<unsigned char>(cell.front())) != 0) {
+        cell.remove_prefix(1);
+    }
+    while (!cell.empty() && std::isspace(static_cast<unsigned char>(cell.back())) != 0) {
+        cell.remove_suffix(1);
+    }
+
+    if (cell.empty()) {
+        return false;
+    }
+
+    if (cell.front() == ':') {
+        cell.remove_prefix(1);
+    }
+
+    if (!cell.empty() && cell.back() == ':') {
+        cell.remove_suffix(1);
+    }
+
+    if (cell.empty()) {
+        return false;
+    }
+
+    return std::ranges::all_of(cell, [](char symbol) { return symbol == '-'; });
 }
 
 }  // namespace
@@ -230,7 +253,15 @@ struct TokenizerState {
 static void parse_markdown_elements(std::string_view line_view, TokenizerState &state) {
     std::size_t ordered_prefix_length = 0;
 
-    if (line_view.starts_with(local_constants::head_4_tag)) {
+    if (line_view.starts_with(local_constants::head_6_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_view.substr(local_constants::head_6_tag.size()));
+        state.push_buffer(token_type::header_4);
+    } else if (line_view.starts_with(local_constants::head_5_tag)) {
+        state.push_buffer(token_type::paragraph);
+        state.m_buffer = std::string(line_view.substr(local_constants::head_5_tag.size()));
+        state.push_buffer(token_type::header_4);
+    } else if (line_view.starts_with(local_constants::head_4_tag)) {
         state.push_buffer(token_type::paragraph);
         state.m_buffer = std::string(line_view.substr(local_constants::head_4_tag.size()));
         state.push_buffer(token_type::header_4);
@@ -259,7 +290,8 @@ static void parse_markdown_elements(std::string_view line_view, TokenizerState &
         state.m_buffer = std::string(line_view.substr(ordered_prefix_length));
         state.push_buffer(token_type::list_ordered);
     } else {
-        if (!line_view.empty() && line_view.front() == '|') {
+        if (has_table_pipe(line_view)) {
+            // Preserve table row line as an individual, distinct token
             state.push_buffer(token_type::paragraph);
             Token table_token;
             table_token.m_type = token_type::paragraph;
@@ -282,7 +314,16 @@ static void evaluate_line_tokens(std::string_view line_view, TokenizerState &sta
         } else {
             state.push_buffer(token_type::paragraph);
             state.m_in_block = true;
-            state.m_language = std::string(line_view.substr(local_constants::fence_tag.size()));
+            std::string_view lang_view = line_view.substr(local_constants::fence_tag.size());
+            while (!lang_view.empty() &&
+                   (std::isspace(static_cast<unsigned char>(lang_view.front())) != 0)) {
+                lang_view.remove_prefix(1);
+            }
+            while (!lang_view.empty() &&
+                   (std::isspace(static_cast<unsigned char>(lang_view.back())) != 0)) {
+                lang_view.remove_suffix(1);
+            }
+            state.m_language = std::string(lang_view);
         }
         return;
     }
@@ -336,10 +377,31 @@ auto Pipeline::decorate_inline_text(std::string_view text_content) const -> std:
         return std::move(*cached);
     }
 
+    std::string processed;
+    processed.reserve(text_content.size() * 11 / 10);
+
+    for (const char character : text_content) {
+        switch (character) {
+            case '&':
+                processed += "&amp;";
+                break;
+            case '<':
+                processed += "&lt;";
+                break;
+            case '>':
+                processed += "&gt;";
+                break;
+            default:
+                processed += character;
+                break;
+        }
+    }
+
+    static const boost::regex format_nl("\n");
     static const boost::regex bold_pattern(R"(\*\*(.*?)\*\*)");
     static const boost::regex code_pattern(R"(`(.*?)`)");
 
-    std::string processed{text_content};
+    processed = boost::regex_replace(processed, format_nl, "<br>");
     processed = boost::regex_replace(processed, bold_pattern, "<b>$1</b>");
 
     std::string inline_code_tag =
@@ -367,6 +429,7 @@ auto Pipeline::decorate_code_block(std::string_view code, const std::string &lan
     static const boost::regex format_nl("\n");
     static const boost::regex format_tab("\t");
     static const boost::regex format_sp("  ");
+
     static const boost::regex marker_01("\x01");
     static const boost::regex marker_02("\x02");
     static const boost::regex marker_03("\x03");
@@ -385,10 +448,10 @@ auto Pipeline::decorate_code_block(std::string_view code, const std::string &lan
     std::string processed{code};
     std::erase(processed, '\r');
 
-    processed = boost::regex_replace(processed, entity_amp, "&amp;");
-    processed = boost::regex_replace(processed, entity_lt, "&lt;");
-    processed = boost::regex_replace(processed, entity_gt, "&gt;");
-
+    // -----------------------------------------------------------------------
+    // STEP 1: Run grammar regexes on RAW code using byte markers (\x01..\x14).
+    // MUST execute BEFORE HTML entity escaping to preserve raw syntax bounds.
+    // -----------------------------------------------------------------------
     const auto *syntax = m_registry.GetSyntaxFor(lang);
     if (syntax != nullptr) {
         std::string result_string;
@@ -437,10 +500,24 @@ auto Pipeline::decorate_code_block(std::string_view code, const std::string &lan
         processed = result_string;
     }
 
+    // -----------------------------------------------------------------------
+    // STEP 2: Escape HTML entities AFTER syntax highlighting rules run.
+    // Non-printable control bytes (\x01..\x14) pass through safely untouched.
+    // -----------------------------------------------------------------------
+    processed = boost::regex_replace(processed, entity_amp, "&amp;");
+    processed = boost::regex_replace(processed, entity_lt, "&lt;");
+    processed = boost::regex_replace(processed, entity_gt, "&gt;");
+
+    // -----------------------------------------------------------------------
+    // STEP 3: Format white space and newline breaks.
+    // -----------------------------------------------------------------------
     processed = boost::regex_replace(processed, format_nl, "<br>");
     processed = boost::regex_replace(processed, format_tab, "&nbsp;&nbsp;&nbsp;&nbsp;");
     processed = boost::regex_replace(processed, format_sp, "&nbsp;&nbsp;");
 
+    // -----------------------------------------------------------------------
+    // STEP 4: Convert byte markers to final HTML font color tags.
+    // -----------------------------------------------------------------------
     std::string text_color_tag = "<font color=\"" + m_theme.m_code_string + "\">";
     processed = boost::regex_replace(processed, marker_01, text_color_tag);
     processed = boost::regex_replace(processed, marker_02, "</font>");
@@ -510,7 +587,6 @@ void Pipeline::handle_header(const Token &token_ref, std::string &html_output,
 
 void Pipeline::handle_list(const Token &token_ref, std::string &html_output, ListStatePair flags,
                            std::string_view list_tag) const {
-    // .get() returns the underlying raw bool reference seamlessly
     if (flags.m_is_alternative.get()) {
         html_output += (list_tag == local_constants::unordered_list_tag) ? "</ol><br>" : "</ul>";
         flags.m_is_alternative.get() = false;
@@ -534,23 +610,46 @@ void Pipeline::handle_code_block(const Token &token_ref, std::string &html_outpu
     html_output += decorate_code_block(token_ref.m_content, token_ref.m_language);
 }
 
-// Fixes Issue 2: Static handler method implementation
 void Pipeline::handle_divider(std::string &html_output) {
     html_output += local_constants::horizontal_rule_tag;
 }
 
 static auto parse_row_cells(std::string_view row_text) -> std::vector<std::string> {
-    std::vector<std::string> parsed_cells;
-    size_t start_pos = (row_text.front() == '|') ? 1 : 0;
-    size_t end_pos = (row_text.back() == '|') ? row_text.size() - 1 : row_text.size();
+    auto is_space = [](unsigned char character) { return std::isspace(character) != 0; };
+    std::string_view trimmed_row = row_text;
 
+    while (!trimmed_row.empty() && is_space(static_cast<unsigned char>(trimmed_row.front()))) {
+        trimmed_row.remove_prefix(1);
+    }
+    while (!trimmed_row.empty() && is_space(static_cast<unsigned char>(trimmed_row.back()))) {
+        trimmed_row.remove_suffix(1);
+    }
+
+    if (trimmed_row.empty()) {
+        return {};
+    }
+
+    const bool has_leading_pipe = (trimmed_row.front() == '|');
+    const bool has_trailing_pipe = (trimmed_row.back() == '|' && trimmed_row.size() > 1 &&
+                                    trimmed_row[trimmed_row.size() - 2] != '\\');
+
+    const size_t start_pos = has_leading_pipe ? 1 : 0;
+    const size_t end_pos = has_trailing_pipe ? trimmed_row.size() - 1 : trimmed_row.size();
+
+    std::vector<std::string> parsed_cells;
     std::string current_cell;
+
     for (size_t char_idx = start_pos; char_idx < end_pos; ++char_idx) {
-        if (row_text[char_idx] == '|') {
+        if (trimmed_row[char_idx] == '|' && (char_idx == 0 || trimmed_row[char_idx - 1] != '\\')) {
             parsed_cells.push_back(current_cell);
             current_cell.clear();
         } else {
-            current_cell.push_back(row_text[char_idx]);
+            if (trimmed_row[char_idx] == '|' && char_idx > 0 && trimmed_row[char_idx - 1] == '\\') {
+                if (!current_cell.empty() && current_cell.back() == '\\') {
+                    current_cell.pop_back();
+                }
+            }
+            current_cell.push_back(trimmed_row[char_idx]);
         }
     }
     parsed_cells.push_back(current_cell);
@@ -558,9 +657,9 @@ static auto parse_row_cells(std::string_view row_text) -> std::vector<std::strin
 }
 
 void emit_rendered_cells(std::string &html_output, const std::vector<std::string> &cells,
-                         size_t row_idx, const config::AppearanceConfig &theme,
+                         size_t rendered_row_idx, const config::AppearanceConfig &theme,
                          const std::function<std::string(std::string_view)> &decorator) {
-    auto is_space = [](unsigned char character) { return std::isspace(character); };
+    auto is_space = [](unsigned char character) { return std::isspace(character) != 0; };
 
     for (const auto &cell_content : cells) {
         std::string trimmed = cell_content;
@@ -568,72 +667,106 @@ void emit_rendered_cells(std::string &html_output, const std::vector<std::string
         trimmed.erase(std::ranges::find_if_not(std::views::reverse(trimmed), is_space).base(),
                       trimmed.end());
 
-        if (row_idx == 0) {
+        if (rendered_row_idx == 0) {
             html_output += R"(<th bgcolor=")" + theme.m_surface_color + R"("><b><font color=")" +
                            theme.m_text_accent + R"(">)" + decorator(trimmed) +
                            R"(</font></b></th>)";
         } else {
-            html_output += R"(<td><font color=")" + theme.m_text_primary + R"(">)" +
-                           decorator(trimmed) + R"(</font></td>)";
+            html_output += R"(<td bgcolor=")" + theme.m_code_bg + R"("> <font color=")" +
+                           theme.m_text_primary + R"(">)" + decorator(trimmed) + R"(</font></td>)";
         }
     }
 }
 
 auto Pipeline::scan_and_emit_table(const std::vector<Token> &tokens, size_t &current_idx,
-                                   std::string &html_output) const -> bool {
-    const auto &token_ref = tokens[current_idx];
-    if (token_ref.m_type != token_type::paragraph || token_ref.m_content.empty() ||
-        token_ref.m_content.front() != '|') {
+                                   std::string &html_output,
+                                   const std::function<void()> &close_active_lists) const -> bool {
+    auto is_candidate_token = [](const Token &tok) -> bool {
+        return tok.m_type == token_type::paragraph && !tok.m_content.empty() &&
+               has_table_pipe(tok.m_content);
+    };
+
+    if (!is_candidate_token(tokens[current_idx])) {
         return false;
     }
 
     std::vector<std::string_view> table_rows;
     size_t lookahead_idx = current_idx;
 
-    while (lookahead_idx < tokens.size()) {
-        const auto &future_token = tokens[lookahead_idx];
-        if (future_token.m_type == token_type::paragraph && !future_token.m_content.empty() &&
-            future_token.m_content.front() == '|') {
-            table_rows.push_back(future_token.m_content);
-            ++lookahead_idx;
-        } else {
-            break;
-        }
+    while (lookahead_idx < tokens.size() && is_candidate_token(tokens[lookahead_idx])) {
+        table_rows.push_back(tokens[lookahead_idx].m_content);
+        ++lookahead_idx;
     }
 
     if (table_rows.size() < local_constants::minimum_valid_table_rows) {
         return false;
     }
 
-    html_output += R"(<br><table width="100%" border="1" cellspacing="0" cellpadding="6" )";
+    // Parse header row (Row 0)
+    std::vector<std::string> header_cells = parse_row_cells(table_rows[0]);
+    const size_t column_count = header_cells.size();
+    if (column_count == 0) {
+        return false;
+    }
+
+    // Parse and strictly validate row 1 as a separator row
+    std::vector<std::string> separator_cells = parse_row_cells(table_rows[1]);
+    if (separator_cells.size() != column_count) {
+        return false;
+    }
+
+    const bool valid_separator = std::ranges::all_of(
+        separator_cells, [](const std::string &cell) { return is_valid_delimiter_cell(cell); });
+
+    if (!valid_separator) {
+        return false;  // Fallback to standard paragraphs if Row 1 is not a valid separator
+    }
+
+    // Collect data rows (row 2 onwards) and normalize/pad/truncate column counts
+    std::vector<std::vector<std::string>> normalized_data_rows;
+    size_t accepted_row_count = 2;
+
+    for (size_t row_idx = 2; row_idx < table_rows.size(); ++row_idx) {
+        std::vector<std::string> data_cells = parse_row_cells(table_rows[row_idx]);
+
+        if (data_cells.size() < column_count) {
+            data_cells.resize(column_count, "");
+        } else if (data_cells.size() > column_count) {
+            data_cells.resize(column_count);
+        }
+
+        normalized_data_rows.push_back(std::move(data_cells));
+        ++accepted_row_count;
+    }
+
+    // Close open lists before writing table HTML
+    close_active_lists();
+
     html_output +=
-        R"(style="border-collapse:collapse; background-color:)" + m_theme.m_code_bg + R"(;">)";
+        R"(<br><table width="100%" border="1" cellspacing="0" cellpadding="6" bgcolor=")";
+    html_output += m_theme.m_code_bg;
+    html_output += R"(">)";
 
     auto decorator_wrapper = [this](std::string_view text) { return decorate_inline_text(text); };
 
-    for (size_t row_idx = 0; row_idx < table_rows.size(); ++row_idx) {
-        auto row_text = table_rows[row_idx];
-        bool is_separator = std::ranges::all_of(row_text, [](char symbol) {
-            return symbol == '|' || symbol == '-' || symbol == ':' || symbol == ' ' ||
-                   symbol == '\t';
-        });
+    // Header row
+    html_output += "<tr>";
+    emit_rendered_cells(html_output, header_cells, 0, m_theme, decorator_wrapper);
+    html_output += "</tr>";
 
-        if (is_separator) {
-            continue;
-        }
-
+    // Data rows
+    for (size_t data_row_idx = 0; data_row_idx < normalized_data_rows.size(); ++data_row_idx) {
         html_output += "<tr>";
-        std::vector<std::string> cells = parse_row_cells(row_text);
-        emit_rendered_cells(html_output, cells, row_idx, m_theme, decorator_wrapper);
+        emit_rendered_cells(html_output, normalized_data_rows[data_row_idx], data_row_idx + 1,
+                            m_theme, decorator_wrapper);
         html_output += "</tr>";
     }
 
     html_output += "</table><br>";
-    current_idx = lookahead_idx;
+    current_idx += accepted_row_count;
     return true;
 }
 
-// -----------------------------------------------------------------------------
 auto Pipeline::emit(const std::vector<Token> &tokens) const -> std::string {
     std::string html_output;
     bool in_unordered_list = false;
@@ -652,8 +785,7 @@ auto Pipeline::emit(const std::vector<Token> &tokens) const -> std::string {
 
     size_t token_idx = 0;
     while (token_idx < tokens.size()) {
-        if (scan_and_emit_table(tokens, token_idx, html_output)) {
-            close_active_lists();
+        if (scan_and_emit_table(tokens, token_idx, html_output, close_active_lists)) {
             continue;
         }
 
@@ -681,7 +813,6 @@ auto Pipeline::emit(const std::vector<Token> &tokens) const -> std::string {
                 handle_divider(html_output);
                 break;
             case token_type::list_unordered:
-                // std::ref explicitly binds the local variable state safely to the wrapper
                 handle_list(token_ref, html_output,
                             ListStatePair{.m_is_active = std::ref(in_unordered_list),
                                           .m_is_alternative = std::ref(in_ordered_list)},

@@ -22,7 +22,9 @@
 
 #include "core/models.hpp"
 #include "engine/storage/attachment_manager.hpp"
+#include "engine/token/token_estimator.hpp"
 #include "ui/error_banner.hpp"
+#include "ui/token_budget_bar.hpp"
 
 class wxBoxSizer;
 
@@ -45,6 +47,7 @@ class ChatPanel final : public wxPanel {
     void append_user_message(std::string_view message) noexcept;
     void load_history(const core::ChatSession &session) noexcept;
     [[nodiscard]] auto get_active_response_stream() const noexcept -> std::string;
+    [[nodiscard]] auto get_active_session() const noexcept -> const core::ChatSession &;
 
     void start_spinner() noexcept;
     void stop_spinner() noexcept;
@@ -54,6 +57,7 @@ class ChatPanel final : public wxPanel {
     void bind_events() noexcept;
     void render_chat_stream() noexcept;
     void refresh_attachment_tray() noexcept;
+    void update_token_budget_display() noexcept;
 
     void on_send_action(wxCommandEvent &event) noexcept;
     void on_attach_action(wxCommandEvent &event) noexcept;
@@ -61,6 +65,7 @@ class ChatPanel final : public wxPanel {
     void on_link_clicked(wxHtmlLinkEvent &event) noexcept;
     void on_prompt_key_down(wxKeyEvent &event) noexcept;
     void on_spinner_mouse_down(wxMouseEvent &event) noexcept;
+    void on_prompt_changed(wxCommandEvent &event) noexcept;
 
     void scroll_to_bottom() noexcept;
     static void handle_code_copy(std::string_view hex_payload) noexcept;
@@ -80,6 +85,10 @@ class ChatPanel final : public wxPanel {
     std::string m_active_response_stream;
     std::string m_last_llm_response;
     std::string m_last_processed_prompt;
+
+    engine::token::TokenEstimator m_token_estimator;
+    core::ChatSession m_active_session;
+    TokenBudgetBar *m_token_budget_bar{nullptr};  // token usage bar
 
     std::unique_ptr<engine::storage::AttachmentManager> m_attachment_engine;
 };

@@ -131,8 +131,9 @@ target_link_libraries(malama_core PUBLIC
     JPEG::JPEG
     PkgConfig::POPPLER_CPP
     spdlog::spdlog
-    Boost::cobalt # FIXED: Linked binary coroutine symbols
-    LibArchive::LibArchive # FIXED: Switched to explicit modern target referencing
+    Boost::cobalt
+    LibArchive::LibArchive
+    ${wxWidgets_LIBRARIES}
 )
 
 # ---------------------------------------------------------------------------
@@ -141,10 +142,13 @@ target_link_libraries(malama_core PUBLIC
 add_executable(malama
     src/main.cpp
     src/ui/chat_panel.cpp
+    src/ui/context_bar.cpp
     src/ui/error_banner.cpp
     src/ui/main_frame.cpp
+    src/ui/session_params_dlg.cpp
     src/ui/settings_dialog.cpp
     src/ui/sidebar_panel.cpp
+    src/ui/token_budget_bar.cpp
 )
 
 include(${wxWidgets_USE_FILE})

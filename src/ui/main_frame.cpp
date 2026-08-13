@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/main_frame.cpp
 // Purpose:     Implements top-level window controls and menu modal dialog loops
-// Author:      Wanjare S<samuelwanjare@proton.me>
+// Author:      Wanjare S <samuelwanjare@proton.me>
 // Created:     2026-06-15
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
@@ -25,7 +25,6 @@
 #include <wx/hyperlink.h>
 #include <wx/icon.h>
 #include <wx/image.h>
-#include <wx/imagjpeg.h>
 #include <wx/menu.h>
 #include <wx/msgdlg.h>
 #include <wx/stdpaths.h>
@@ -33,7 +32,9 @@
 
 #include "common/constants.hpp"
 #include "config/config_manager.hpp"
+#include "engine/export/export_engine.hpp"
 #include "ui/chat_panel.hpp"
+#include "ui/session_params_dlg.hpp"
 #include "ui/settings_dialog.hpp"
 #include "ui/sidebar_panel.hpp"
 
@@ -43,11 +44,12 @@ using std::filesystem::path;
 wxDEFINE_EVENT(EVT_MALAMA_TOKEN, wxThreadEvent);
 wxDECLARE_EVENT(EVT_USER_PROMPT, wxCommandEvent);
 
-// FIXED: Scoped menu identifier values matching linkage definitions
+// Scoped menu identifier values matching linkage definitions
 inline constexpr int id_menu_preferences = 12001;
-inline constexpr int id_menu_exit = 12002;
-inline constexpr int id_menu_about = 12003;
-inline constexpr int id_menu_licence = 12004;
+inline constexpr int id_menu_session_params = 12002;
+inline constexpr int id_menu_exit = 12003;
+inline constexpr int id_menu_about = 12004;
+inline constexpr int id_menu_licence = 12005;
 inline constexpr std::size_t MAX_SESSION_TITLE_LENGTH = 25;
 
 static int s_token_count = 0;
@@ -105,11 +107,9 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
 void MainFrame::load_application_icon() noexcept {
     namespace fs = std::filesystem;
 
-    // 1. Get executable directory using standard UTF-8 string on Linux
     const std::string exe_full_path = wxStandardPaths::Get().GetExecutablePath().ToStdString();
     const fs::path exe_dir = fs::path(exe_full_path).parent_path();
 
-    // 2. Search candidate locations (build directory & assets)
     const std::vector<fs::path> candidate_paths = {
         exe_dir / "assets" / "malama.png", exe_dir / "assets" / "malama.png",
         exe_dir / "malama.png", fs::path("./assets/malama.png")};
@@ -128,11 +128,9 @@ void MainFrame::load_application_icon() noexcept {
         return;
     }
 
-    // 3. Load via wxImage (Requires wxInitAllImageHandlers() in wxApp::OnInit)
     wxImage logo_image;
     if (logo_image.LoadFile(wxString::FromUTF8(target_image_path.string()), wxBITMAP_TYPE_PNG) &&
         logo_image.IsOk()) {
-        // Convert wxImage -> wxBitmap -> wxIcon
         wxBitmap logo_bitmap(logo_image);
         wxIcon app_icon;
         app_icon.CopyFromBitmap(logo_bitmap);
@@ -140,7 +138,7 @@ void MainFrame::load_application_icon() noexcept {
         SetIcon(app_icon);
         spdlog::info("Successfully loaded frame icon from: {}", target_image_path.string());
     } else {
-        spdlog::error("Failed to decode JPEG image buffer at: {}", target_image_path.string());
+        spdlog::error("Failed to decode PNG image buffer at: {}", target_image_path.string());
     }
 }
 
@@ -163,7 +161,7 @@ auto MainFrame::AppendToken(std::string_view token_segment) noexcept -> void {
     std::chrono::duration<double> duration = now - s_start_time;
     double tps = 0.0;
     if (duration.count() > 0.0) {
-        tps = s_token_count / duration.count();
+        tps = static_cast<double>(s_token_count) / duration.count();
     }
 
     double denominator = 200.0;
@@ -247,17 +245,28 @@ void MainFrame::setup_menu_bar() noexcept {
         return;
     }
 
+    // 1. File Menu
     auto *file_menu_ptr = new (std::nothrow) wxMenu();
     if (file_menu_ptr == nullptr) {
         delete menu_bar_ptr;
         return;
     }
 
-    file_menu_ptr->Append(id_menu_preferences, "Settings...\tCtrl+,", "Configure malama settings");
+    file_menu_ptr->Append(id_menu_preferences, "Global Settings...\tCtrl+,",
+                          "Configure application settings");
     file_menu_ptr->AppendSeparator();
     file_menu_ptr->Append(id_menu_exit, "Exit\tAlt-X", "Terminate application framework");
     menu_bar_ptr->Append(file_menu_ptr, "&File");
 
+    // 2. Session Menu (Parameters & System Prompt overrides)
+    auto *session_menu_ptr = new (std::nothrow) wxMenu();
+    if (session_menu_ptr != nullptr) {
+        session_menu_ptr->Append(id_menu_session_params, "Session Parameters...\tCtrl+Shift+P",
+                                 "Tune temperature, context size (num_ctx), and system prompt");
+        menu_bar_ptr->Append(session_menu_ptr, "&Session");
+    }
+
+    // 3. Help Menu
     auto *help_menu_ptr = new (std::nothrow) wxMenu();
     if (help_menu_ptr == nullptr) {
         delete menu_bar_ptr;
@@ -302,6 +311,7 @@ void MainFrame::setup_workspace_layout() noexcept {
 
 void MainFrame::bind_action_events() noexcept {
     Bind(wxEVT_MENU, &MainFrame::on_preferences_action, this, id_menu_preferences);
+    Bind(wxEVT_MENU, &MainFrame::on_session_params_action, this, id_menu_session_params);
     Bind(wxEVT_MENU, &MainFrame::on_exit_action, this, id_menu_exit);
     Bind(wxEVT_MENU, &MainFrame::on_about_action, this, id_menu_about);
     Bind(wxEVT_MENU, &MainFrame::on_licence_action, this, id_menu_licence);
@@ -309,7 +319,6 @@ void MainFrame::bind_action_events() noexcept {
     Bind(EVT_LOAD_SESSION, &MainFrame::on_load_session, this);
     Bind(EVT_NEW_CHAT_REQUESTED, &MainFrame::on_new_chat_action, this);
 
-    // FIXED: Formats macro constraint checks cleanly across loop bindings
     Bind(EVT_CANCEL_GENERATION, [this](wxCommandEvent &WXUNUSED(event)) {
         spdlog::warn("Asynchronous LLM computation stream terminated by the user.");
         if (m_sidebar_panel_ptr != nullptr) {
@@ -362,6 +371,15 @@ void MainFrame::on_preferences_action(wxCommandEvent &WXUNUSED(event)) noexcept 
     }
 }
 
+void MainFrame::on_session_params_action(wxCommandEvent &WXUNUSED(event)) noexcept {
+    SessionParamsDialog dialog(this, m_current_session_params);
+    if (dialog.ShowModal() == wxID_OK) {
+        m_current_session_params = dialog.GetParameters();
+        spdlog::info("Updated thread session parameters: temperature={:.2f}, num_ctx={}",
+                     m_current_session_params.m_temperature, m_current_session_params.m_num_ctx);
+    }
+}
+
 void MainFrame::on_exit_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     Close(true);
 }
@@ -369,12 +387,28 @@ void MainFrame::on_exit_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     wxAboutDialogInfo info;
     info.SetName(_("Malama"));
-    info.SetVersion(_("0.2.7-7"));
+    info.SetVersion(_("0.3.0"));
     info.SetDescription(
         wxT("Native Linux chat client for local LLMs — no cloud, no browser, no compromise."));
     info.SetCopyright(wxT("Copyright (C) 2026"));
     info.SetWebSite(wxT("https://magpiny.dev"));
     info.AddDeveloper(wxT("Wanjare Samuel"));
+
+    // Attempt to load the application logo with fallbacks for dev/build & installed environments
+    wxIcon logo_icon;
+    if (wxFileExists(wxT("assets/malama.png"))) {
+        logo_icon.LoadFile(wxT("assets/malama.png"), wxBITMAP_TYPE_PNG);
+    } else if (wxFileExists(wxT("malama.png"))) {
+        logo_icon.LoadFile(wxT("malama.png"), wxBITMAP_TYPE_PNG);
+    } else if (wxFileExists(wxT("/usr/share/icons/hicolor/256x256/apps/malama.png"))) {
+        logo_icon.LoadFile(wxT("/usr/share/icons/hicolor/256x256/apps/malama.png"),
+                           wxBITMAP_TYPE_PNG);
+    }
+
+    if (logo_icon.IsOk()) {
+        info.SetIcon(logo_icon);
+    }
+
     wxAboutBox(info, this);
 }
 
@@ -453,7 +487,6 @@ enum class LicenceDialogError : std::uint8_t {
     }
 }
 
-// FIXED: Parameter signature updated with macros to pass compilation constraints safely
 void MainFrame::on_licence_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     if (const auto result = show_licence_dialog(this); !result) {
         spdlog::error("{}", to_string(result.error()));
@@ -498,11 +531,36 @@ void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
     }
 }
 
-// FIXED: Clean signature setup with WXUNUSED prevents errors on active build sequences
 void MainFrame::on_new_chat_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     m_current_session_id.clear();
     if (m_chat_panel_ptr != nullptr) {
         m_chat_panel_ptr->load_history(core::ChatSession{});
+    }
+}
+
+void MainFrame::on_export_session_action(wxCommandEvent &WXUNUSED(event)) {
+    if (m_chat_panel_ptr == nullptr) {
+        return;
+    }
+
+    const auto &active_session = m_chat_panel_ptr->get_active_session();
+
+    wxDirDialog dir_dialog(this, _("Select Export Directory"), wxGetHomeDir(),
+                           wxDD_DEFAULT_STYLE | wxDD_DIR_MUST_EXIST);
+    if (dir_dialog.ShowModal() != wxID_OK) {
+        return;
+    }
+
+    std::filesystem::path target_dir = dir_dialog.GetPath().ToStdString();
+
+    malama::engine::export_sys::ExportEngine engine;
+    auto result = engine.export_session(active_session, target_dir,
+                                        malama::engine::export_sys::ExportFormat::Markdown);
+
+    if (result.has_value()) {
+        wxLogMessage(_("Successfully exported thread to: %s"), result.value().string().c_str());
+    } else {
+        wxLogError(_("Export failed with error code: %d"), static_cast<int>(result.error()));
     }
 }
 

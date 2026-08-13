@@ -39,7 +39,7 @@ inline constexpr int id_control_new_btn = 11004;
 SidebarPanel::SidebarPanel(wxWindow *parent_ptr,
                            engine::storage::HistoryManager *history_manager_ptr)
     : wxPanel(parent_ptr, wxID_ANY), m_history_manager_ptr(history_manager_ptr) {
-    SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
+    SetBackgroundColour(wxColour(std::string(constants::sidebar_bg_color)));
     setup_layout();
     bind_events();
 
@@ -60,7 +60,7 @@ void SidebarPanel::setup_layout() noexcept {
         delete sizer_ptr;
         return;
     }
-    header_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
+    header_ptr->SetForegroundColour(wxColour(std::string(constants::body_text_color)));
 
     m_new_chat_btn_ptr =
         new (std::nothrow) wxButton(this, id_control_new_btn, wxT("➕ New Chat"), wxDefaultPosition,
@@ -70,8 +70,8 @@ void SidebarPanel::setup_layout() noexcept {
         delete sizer_ptr;
         return;
     }
-    m_new_chat_btn_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
-    m_new_chat_btn_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
+    m_new_chat_btn_ptr->SetBackgroundColour(wxColour(std::string(constants::appwindow_bg_color)));
+    m_new_chat_btn_ptr->SetForegroundColour(wxColour(std::string(constants::chatinput_text_color)));
 
     m_new_chat_btn_ptr->SetToolTip("Initialize a clean conversation workspace session");
     m_new_chat_btn_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
@@ -84,7 +84,7 @@ void SidebarPanel::setup_layout() noexcept {
         delete sizer_ptr;
         return;
     }
-    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
+    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::sidebar_bg_color)));
 
     m_metrics_text_ptr = new (std::nothrow) wxStaticText(this, wxID_ANY, "");
     if (m_metrics_text_ptr == nullptr) {
@@ -94,7 +94,7 @@ void SidebarPanel::setup_layout() noexcept {
         delete sizer_ptr;
         return;
     }
-    m_metrics_text_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
+    m_metrics_text_ptr->SetForegroundColour(wxColour(std::string(constants::body_text_color)));
 
     sizer_ptr->Add(header_ptr, constants::layout_proportion_fixed, wxALL | wxEXPAND,
                    constants::default_margin_padding);
@@ -165,8 +165,8 @@ void SidebarPanel::populate_sidebar() noexcept {
     m_history_list_ptr->Clear();
     m_active_metadata.clear();
 
-    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::color_dark_grey)));
-    m_history_list_ptr->SetForegroundColour(wxColour(std::string(constants::color_smoke_white)));
+    m_history_list_ptr->SetBackgroundColour(wxColour(std::string(constants::sidebar_bg_color)));
+    m_history_list_ptr->SetForegroundColour(wxColour(std::string(constants::chatinput_text_color)));
 
     m_active_metadata = m_history_manager_ptr->LoadAllMetadata();
 

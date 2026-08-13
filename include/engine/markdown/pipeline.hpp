@@ -62,8 +62,9 @@ class Pipeline final {
     // Fixes Issue 2: Stateless visual break layout made static
     static void handle_divider(std::string &html_output);
 
-    [[nodiscard]] auto scan_and_emit_table(const std::vector<Token> &tokens, size_t &current_idx,
-                                           std::string &html_output) const -> bool;
+    auto scan_and_emit_table(const std::vector<Token> &tokens, size_t &current_idx,
+                             std::string &html_output,
+                             const std::function<void()> &close_active_lists) const -> bool;
 
     config::AppearanceConfig m_theme;
     SyntaxRegistry m_registry;

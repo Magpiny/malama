@@ -28,7 +28,7 @@
 namespace malama::network {
 
 struct OllamaModelItem final {
-    std::string name{};
+    std::string m_name{};
 };
 
 struct OllamaTagsResponse final {
@@ -40,7 +40,7 @@ struct OllamaTagsResponse final {
 template<>
 struct glz::meta<malama::network::OllamaModelItem> {
     using T = malama::network::OllamaModelItem;
-    static constexpr auto value = object("name", &T::name);
+    static constexpr auto value = object("name", &T::m_name);
 };
 
 template<>
@@ -350,8 +350,8 @@ auto SettingsDialog::fetch_local_models(const std::string &host, const std::stri
                     glz::read<glz::opts{.error_on_unknown_keys = false}>(parsed_res, body_content);
                 if (!parse_err) {
                     for (const auto &item : parsed_res.models) {
-                        if (!item.name.empty()) {
-                            models_list.push_back(item.name);
+                        if (!item.m_name.empty()) {
+                            models_list.push_back(item.m_name);
                         }
                     }
                 }
