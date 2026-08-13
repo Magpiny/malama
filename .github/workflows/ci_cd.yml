@@ -25,7 +25,7 @@ jobs:
             git cmake ninja pkgconf gcc \
             wxwidgets-gtk3 sqlite poppler \
             libarchive pugixml libpng libjpeg-turbo \
-            spdlog boost boost-libs
+            spdlog boost boost-libs appstream
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
@@ -57,7 +57,7 @@ jobs:
             git cmake ninja pkgconf gcc \
             wxwidgets-gtk3 sqlite poppler \
             libarchive pugixml libpng libjpeg-turbo \
-            spdlog boost boost-libs wget file
+            spdlog boost boost-libs wget file appstream
       - name: Checkout Code
         uses: actions/checkout@v4
       - name: Build Release Binary
@@ -68,11 +68,30 @@ jobs:
         run: |
           chmod +x scripts/build_appimage.sh
           ./scripts/build_appimage.sh
+      - name: Verify AppImage Artifact Naming
+        run: |
+          echo "🔍 Checking for expected AppImage artifact..."
+          VERSION=$(grep -oP 'project\(malama VERSION \K[0-9.]+' CMakeLists.txt || echo "0.0.0")
+          EXPECTED="Malama-v${VERSION}-x86_64.AppImage"
+          if [ ! -f "${EXPECTED}" ]; then
+            echo "❌ [ERROR] => Expected artifact '${EXPECTED}' not found."
+            echo "❌ Files present in workspace:"
+            ls -la *.AppImage* 2>/dev/null || echo "  (none found)"
+            exit 1
+          fi
+          MATCH_COUNT=$(ls Malama-v*-x86_64.AppImage 2>/dev/null | wc -l)
+          if [ "${MATCH_COUNT}" -ne 1 ]; then
+            echo "❌ [ERROR] => Expected exactly 1 matching AppImage, found ${MATCH_COUNT}."
+            ls -la Malama-v*-x86_64.AppImage
+            exit 1
+          fi
+          echo "✅ Found exactly one correctly-named artifact: ${EXPECTED}"
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             Malama-v*-x86_64.AppImage
             Malama-v*-x86_64.AppImage.zsync
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -22,19 +22,19 @@
 namespace malama::config {
 
 struct EngineConfig final {
-    std::string m_host{"127.0.0.1"};
-    std::string m_port{"11434"};
-    std::string m_active_model = "ornith:latest";
+    std::string m_host{constants::default_ollama_host};
+    std::string m_port{constants::default_ollama_port};
+    std::string m_active_model = constants::fallback_model_name;
     bool m_thinking_enabled{false};
 };
 
 struct AppearanceConfig final {
-    std::string m_theme_name{"dark_maroon"};
-    std::string m_bg_color{"#2d0309"};
-    std::string m_surface_color{"#420912"};
-    std::string m_text_primary{"#f5f5f7"};
+    std::string m_theme_name{"malama_default"};
+    std::string m_bg_color{constants::chatpanel_bg_color};
+    std::string m_surface_color{constants::chatinput_bg_color};
+    std::string m_text_primary{constants::chatinput_text_color};
     std::string m_text_accent{"#c4929a"};
-    std::string m_code_bg{"#1a0105"};
+    std::string m_code_bg{constants::codeblock_bg_color};
     std::string m_code_keyword{"#ff7b72"};
     std::string m_code_string{"#a5d6ff"};
     std::string m_code_type{"#d2a8ff"};
@@ -42,8 +42,8 @@ struct AppearanceConfig final {
     std::string m_code_line_num{"#666666"};
 
     // FIXED: Added missing tracking variables for v0.2.6 milestones
-    std::string m_sidebar_bg{"#420912"};
-    std::string m_sidebar_text{"#f5f5f7"};
+    std::string m_sidebar_bg{constants::sidebar_bg_color};
+    std::string m_sidebar_text{constants::body_text_color};
     int m_font_size{constants::default_font_size};
     std::string m_font_family{"Sans"};
 };

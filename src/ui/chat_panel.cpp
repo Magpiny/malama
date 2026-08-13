@@ -1,11 +1,13 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/chat_panel.cpp
-// Purpose:     Implements composite layouts, hover cursors, and system toasts
+// Purpose:     Implements composite layouts, live token budget updates, and toasts
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ui/chat_panel.hpp"
 
@@ -77,7 +79,7 @@ inline constexpr int nibble_bit_shift = 4;
 ChatPanel::ChatPanel(wxWindow *parent_ptr)
     : wxPanel(parent_ptr, wxID_ANY),
       m_attachment_engine(std::make_unique<engine::storage::AttachmentManager>()) {
-    SetBackgroundColour(wxColour(std::string(constants::color_dark_maroon)));
+    SetBackgroundColour(wxColour(constants::chatpanel_bg_color));
     setup_layout();
     bind_events();
 }
@@ -88,11 +90,12 @@ void ChatPanel::setup_layout() noexcept {
         wxHtmlWindow(this, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxHW_SCROLLBAR_AUTO);
 
     m_error_banner_ptr = new (std::nothrow) ErrorBanner(this);
+    m_token_budget_bar = new (std::nothrow) TokenBudgetBar(this);
 
     m_tray_container_ptr = new (std::nothrow) wxPanel(this, wxID_ANY);
     m_tray_sizer_ptr = new (std::nothrow) wxBoxSizer(wxHORIZONTAL);
     m_tray_container_ptr->SetSizer(m_tray_sizer_ptr);
-    m_tray_container_ptr->SetBackgroundColour(wxColour("#1A0105"));
+    m_tray_container_ptr->SetBackgroundColour(wxColour(constants::appwindow_bg_color));
     m_tray_container_ptr->Hide();
 
     auto *input_control_sizer = new (std::nothrow) wxBoxSizer(wxHORIZONTAL);
@@ -113,9 +116,9 @@ void ChatPanel::setup_layout() noexcept {
 
     if (main_sizer == nullptr || m_chat_display_ptr == nullptr || m_error_banner_ptr == nullptr ||
         m_tray_container_ptr == nullptr || input_control_sizer == nullptr ||
-        m_attach_button_ptr == nullptr || m_prompt_input_ptr == nullptr ||
-        m_spinner_ptr == nullptr || m_copy_button_ptr == nullptr || m_send_button_ptr == nullptr)
-        [[unlikely]] {
+        m_token_budget_bar == nullptr || m_attach_button_ptr == nullptr ||
+        m_prompt_input_ptr == nullptr || m_spinner_ptr == nullptr || m_copy_button_ptr == nullptr ||
+        m_send_button_ptr == nullptr) [[unlikely]] {
         return;
     }
 
@@ -132,7 +135,7 @@ void ChatPanel::setup_layout() noexcept {
     m_send_button_ptr->SetCursor(wxCursor(wxCURSOR_HAND));
 
     m_spinner_ptr->Hide();
-    m_raw_markdown_history = "### System Channel\n`malama v0.2.7-multimodal` ready.\n\n---";
+    m_raw_markdown_history = "### System Channel\n`malama v0.3.0-multimodal` ready.\n\n---";
     render_chat_stream();
 
     input_control_sizer->Add(m_attach_button_ptr, 0, wxALIGN_CENTER_VERTICAL | wxALL,
@@ -147,6 +150,8 @@ void ChatPanel::setup_layout() noexcept {
 
     main_sizer->Add(m_chat_display_ptr, 1, wxEXPAND | wxALL, main_layout_spacing);
     main_sizer->Add(m_error_banner_ptr, 0, wxEXPAND | wxLEFT | wxRIGHT, main_layout_spacing);
+    main_sizer->Add(m_token_budget_bar, 0, wxEXPAND | wxLEFT | wxRIGHT | wxTOP,
+                    main_layout_spacing);
     main_sizer->Add(m_tray_container_ptr, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM,
                     tray_layout_spacing);
     main_sizer->Add(input_control_sizer, 0, wxEXPAND | wxALL, main_layout_spacing);
@@ -154,13 +159,113 @@ void ChatPanel::setup_layout() noexcept {
     SetSizer(main_sizer);
 }
 
-void ChatPanel::bind_events() noexcept {
-    m_send_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_send_action, this);
-    m_attach_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_attach_action, this);
-    m_copy_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_copy_action, this);
-    m_prompt_input_ptr->Bind(wxEVT_KEY_DOWN, &ChatPanel::on_prompt_key_down, this);
-    m_chat_display_ptr->Bind(wxEVT_HTML_LINK_CLICKED, &ChatPanel::on_link_clicked, this);
-    m_spinner_ptr->Bind(wxEVT_LEFT_DOWN, &ChatPanel::on_spinner_mouse_down, this);
+[[nodiscard]] auto ChatPanel::get_active_session() const noexcept -> const core::ChatSession & {
+    return m_active_session;
+}
+
+void ChatPanel::update_token_budget_display() noexcept {
+    if (m_token_budget_bar == nullptr) {
+        return;
+    }
+
+    const std::string current_prompt =
+        (m_prompt_input_ptr != nullptr) ? m_prompt_input_ptr->GetValue().ToStdString() : "";
+
+    std::vector<engine::storage::AttachmentInfo> pending_attachments;
+    if (m_attachment_engine != nullptr) {
+        pending_attachments = m_attachment_engine->GetPendingAttachments();
+    }
+
+    // 1. Calculate tokens for stored history + pending attachments + typed input
+    std::size_t estimated_tokens = m_token_estimator.estimate_payload_tokens(
+        current_prompt, pending_attachments, m_active_session.m_messages);
+
+    // 2. Add tokens from live active response stream
+    if (!m_active_response_stream.empty()) {
+        estimated_tokens += m_token_estimator.estimate_text_tokens(m_active_response_stream);
+    }
+
+    std::size_t num_ctx_limit = m_active_session.m_metadata.m_parameters.m_num_ctx;
+    if (num_ctx_limit == 0UZ) {
+        num_ctx_limit = 4096UZ;  // Fallback default context window limit
+    }
+
+    // 3. Update Visual Budget Bar
+    m_token_budget_bar->UpdateUsage(estimated_tokens, num_ctx_limit);
+
+    // 4. Update Error Banner alert
+    if (m_error_banner_ptr != nullptr) {
+        if (estimated_tokens >= num_ctx_limit) {
+            m_error_banner_ptr->ShowAlert(
+                std::format(
+                    "Context Budget Limit: Token payload (~{}) exceeds active num_ctx ({}).",
+                    estimated_tokens, num_ctx_limit),
+                BannerState::WARNING);
+        } else {
+            m_error_banner_ptr->HideAlert();
+        }
+    }
+}
+
+void ChatPanel::append_token(std::string_view token_segment) noexcept {
+    m_active_response_stream.append(token_segment.data(), token_segment.size());
+    render_chat_stream();
+    update_token_budget_display();
+}
+
+void ChatPanel::append_user_message(std::string_view message) noexcept {
+    // Finalize prior assistant stream into session history
+    if (!m_active_response_stream.empty()) {
+        m_last_llm_response = m_active_response_stream;
+        m_raw_markdown_history += "\n" + m_active_response_stream + "\n\n---";
+
+        m_active_session.m_messages.push_back(
+            {.m_role = core::MessageRole::Assistant, .m_content = m_active_response_stream});
+        m_active_response_stream.clear();
+    }
+
+    std::string lookahead_match = std::string(message);
+
+    if (m_last_processed_prompt == lookahead_match ||
+        m_last_processed_prompt.starts_with(lookahead_match)) {
+        return;
+    }
+    m_last_processed_prompt = lookahead_match;
+
+    // Save user message directly into session history
+    m_active_session.m_messages.push_back(
+        {.m_role = core::MessageRole::User, .m_content = lookahead_match});
+
+    m_raw_markdown_history += "\n\n### 👤 User\n" + lookahead_match + "\n\n### 🤖 malama\n";
+    render_chat_stream();
+    update_token_budget_display();
+}
+
+void ChatPanel::load_history(const core::ChatSession &session) noexcept {
+    m_active_session = session;
+    m_raw_markdown_history = "### System Channel\n`malama v0.3.0-multimodal` synchronized.\n\n---";
+    m_active_response_stream.clear();
+    m_last_llm_response.clear();
+    m_last_processed_prompt.clear();
+
+    for (const auto &message : session.m_messages) {
+        if (message.m_role == core::MessageRole::User) {
+            m_raw_markdown_history += "\n\n### 👤 User\n" + message.m_content;
+            m_last_processed_prompt = message.m_content;
+        } else if (message.m_role == core::MessageRole::Assistant) {
+            m_raw_markdown_history += "\n\n### 🤖 malama\n" + message.m_content + "\n\n---";
+            m_last_llm_response = message.m_content;
+        } else if (message.m_role == core::MessageRole::System) {
+            m_raw_markdown_history += "\n\n### ⚙️ System Context\n" + message.m_content + "\n\n---";
+        }
+    }
+    render_chat_stream();
+    scroll_to_bottom();
+    update_token_budget_display();
+}
+
+void ChatPanel::on_prompt_changed(wxCommandEvent &WXUNUSED(event)) noexcept {
+    update_token_budget_display();
 }
 
 void ChatPanel::on_spinner_mouse_down(wxMouseEvent &WXUNUSED(event)) noexcept {
@@ -196,7 +301,6 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
         std::string target_path = selected_paths[index].ToStdString();
         auto result = m_attachment_engine->AnalyzeAndAdd(target_path);
 
-        // FIXED: Remapped expected outcome evaluation vectors to eliminate standard token negation
         if (!result.has_value()) {
             switch (result.error()) {
                 case engine::storage::IngestionError::IMAGE_TOO_LARGE: {
@@ -205,7 +309,6 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
                         BannerState::ERROR);
                     break;
                 }
-                // FIXED: Integrated semantic branch handling the expanded PDF threshold failures
                 case engine::storage::IngestionError::DOCUMENT_TOO_LARGE: {
                     m_error_banner_ptr->ShowAlert(
                         "File limit crossed: Large document targets must be under 4MB.",
@@ -240,6 +343,7 @@ void ChatPanel::on_attach_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     }
 
     refresh_attachment_tray();
+    update_token_budget_display();
 }
 
 void ChatPanel::refresh_attachment_tray() noexcept {
@@ -262,22 +366,22 @@ void ChatPanel::refresh_attachment_tray() noexcept {
             (info.m_type == engine::storage::AttachmentType::IMAGE) ? "🖼️ " : "📄 ";
         auto *label = new (std::nothrow)
             wxStaticText(chip, wxID_ANY, wxString::FromUTF8(prefix + info.m_file_name));
-        label->SetForegroundColour(wxColour("#F5F5F7"));
+        label->SetForegroundColour(wxColour(constants::chatinput_text_color));
 
         auto *close_button =
             new (std::nothrow) wxButton(chip, wxID_ANY, wxString::FromUTF8("❌"), wxDefaultPosition,
                                         wxDefaultSize, wxBU_EXACTFIT | wxBORDER_NONE);
-        close_button->SetBackgroundColour(wxColour("#2D2D2D"));
-        close_button->SetForegroundColour(wxColour("#F5F5F7"));
+        close_button->SetBackgroundColour(wxColour(constants::chatinput_bg_color));
+        close_button->SetForegroundColour(wxColour(constants::chatinput_text_color));
         close_button->SetCursor(wxCursor(wxCURSOR_HAND));
         close_button->SetToolTip("Forcibly drop this asset signature from current prompt queue");
 
         close_button->Bind(wxEVT_BUTTON, [this, index](wxCommandEvent &) {
             m_attachment_engine->RemoveByIndex(index);
             refresh_attachment_tray();
+            update_token_budget_display();
         });
 
-        // FIXED: Broken configuration verification branches mapped safely across layout lines
         if (chip == nullptr || chip_sizer == nullptr || label == nullptr || close_button == nullptr)
             [[unlikely]] {
             continue;
@@ -288,7 +392,7 @@ void ChatPanel::refresh_attachment_tray() noexcept {
                         control_element_padding);
 
         chip->SetSizer(chip_sizer);
-        chip->SetBackgroundColour(wxColour("#2d2d2d"));
+        chip->SetBackgroundColour(wxColour(constants::chatpanel_bg_color));
 
         m_tray_sizer_ptr->Add(chip, 0, wxALIGN_CENTER_VERTICAL | wxALL, control_element_padding);
     }
@@ -349,6 +453,7 @@ void ChatPanel::on_send_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 
     m_attachment_engine->ClearQueue();
     refresh_attachment_tray();
+    update_token_budget_display();
 }
 
 void ChatPanel::scroll_to_bottom() noexcept {
@@ -373,51 +478,6 @@ void ChatPanel::render_chat_stream() noexcept {
         theme.m_bg_color, theme.m_text_primary, html_body);
 
     m_chat_display_ptr->SetPage(wxString::FromUTF8(complete_html.data(), complete_html.size()));
-    scroll_to_bottom();
-}
-
-void ChatPanel::append_token(std::string_view token_segment) noexcept {
-    m_active_response_stream.append(token_segment.data(), token_segment.size());
-    render_chat_stream();
-}
-
-void ChatPanel::append_user_message(std::string_view message) noexcept {
-    if (!m_active_response_stream.empty()) {
-        m_last_llm_response = m_active_response_stream;
-        m_raw_markdown_history += "\n" + m_active_response_stream + "\n\n---";
-        m_active_response_stream.clear();
-    }
-
-    std::string lookahead_match = std::string(message);
-
-    if (m_last_processed_prompt == lookahead_match ||
-        m_last_processed_prompt.starts_with(lookahead_match)) {
-        return;
-    }
-    m_last_processed_prompt = lookahead_match;
-
-    m_raw_markdown_history += "\n\n### 👤 User\n" + lookahead_match + "\n\n### 🤖 malama\n";
-    render_chat_stream();
-}
-
-void ChatPanel::load_history(const core::ChatSession &session) noexcept {
-    m_raw_markdown_history = "### System Channel\n`malama v0.2.7-multimodal` synchronized.\n\n---";
-    m_active_response_stream.clear();
-    m_last_llm_response.clear();
-    m_last_processed_prompt.clear();
-
-    for (const auto &message : session.m_messages) {
-        if (message.m_role == core::MessageRole::User) {
-            m_raw_markdown_history += "\n\n### 👤 User\n" + message.m_content;
-            m_last_processed_prompt = message.m_content;
-        } else if (message.m_role == core::MessageRole::Assistant) {
-            m_raw_markdown_history += "\n\n### 🤖 malama\n" + message.m_content + "\n\n---";
-            m_last_llm_response = message.m_content;
-        } else if (message.m_role == core::MessageRole::System) {
-            m_raw_markdown_history += "\n\n### ⚙️ System Context\n" + message.m_content + "\n\n---";
-        }
-    }
-    render_chat_stream();
     scroll_to_bottom();
 }
 
@@ -527,6 +587,16 @@ void ChatPanel::on_link_clicked(wxHtmlLinkEvent &event) noexcept {
     } else {
         event.Skip();
     }
+}
+
+void ChatPanel::bind_events() noexcept {
+    m_send_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_send_action, this);
+    m_attach_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_attach_action, this);
+    m_copy_button_ptr->Bind(wxEVT_BUTTON, &ChatPanel::on_copy_action, this);
+    m_prompt_input_ptr->Bind(wxEVT_KEY_DOWN, &ChatPanel::on_prompt_key_down, this);
+    m_prompt_input_ptr->Bind(wxEVT_TEXT, &ChatPanel::on_prompt_changed, this);
+    m_chat_display_ptr->Bind(wxEVT_HTML_LINK_CLICKED, &ChatPanel::on_link_clicked, this);
+    m_spinner_ptr->Bind(wxEVT_LEFT_DOWN, &ChatPanel::on_spinner_mouse_down, this);
 }
 
 }  // namespace malama::ui

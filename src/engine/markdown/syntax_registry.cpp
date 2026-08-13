@@ -11,6 +11,7 @@
 
 #include "engine/markdown/syntax_registry.hpp"
 
+#include <boost/algorithm/string.hpp>
 #include <boost/regex.hpp>
 
 namespace malama::engine::markdown {
@@ -82,7 +83,7 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
                                               .m_compiled_pattern = boost::regex(pat_cpp_preproc),
                                               .m_replacement_format = "\x05$1\x06"});
 
-        std::string pat_cpp_keyword = R"(\b(auto|const|constexpr|std|int|void|std|)";
+        std::string pat_cpp_keyword = R"(\b(auto|const|constexpr|std|int|void|)";
         pat_cpp_keyword += R"(return|public|private|string|catch|decltype|)";
         pat_cpp_keyword += R"(protected|namespace|using|template|typename|)";
         pat_cpp_keyword += R"(new|delete|if|&&|&=|!|!=|&|asm|typeid|throw|)";
@@ -102,7 +103,6 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
 
         cache["cpp"] = lang_cpp;
         cache["c++"] = lang_cpp;
-
         cache["c"] = lang_cpp;
 
         // ---------------------------------------------------------------------
@@ -111,8 +111,7 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
         LanguageSyntax lang_python;
         lang_python.m_name = "python";
 
-        std::string pat_py_multiline = R"raw( Maryland ("""[\s\S]*?"""|'''[\s\S]*?'''))raw";
-        pat_py_multiline = R"raw(("""[\s\S]*?"""|'''[\s\S]*?'''))raw";
+        std::string pat_py_multiline = R"raw(("""[\s\S]*?"""|'''[\s\S]*?'''))raw";
         lang_python.m_rules.push_back(
             SyntaxRule{.m_pattern_string = pat_py_multiline,
                        .m_compiled_pattern = boost::regex(pat_py_multiline),
@@ -185,8 +184,7 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
                                               .m_compiled_pattern = boost::regex(pat_css_property),
                                               .m_replacement_format = "\x05$1\x06"});
 
-        std::string pat_css_punct = R"(([\{\}\( Bord ]))";
-        pat_css_punct = R"(([\{\}\(\)]))";
+        std::string pat_css_punct = R"(([\{\}\(\)]))";
         lang_css.m_rules.push_back(SyntaxRule{.m_pattern_string = pat_css_punct,
                                               .m_compiled_pattern = boost::regex(pat_css_punct),
                                               .m_replacement_format = "\x0F$1\x10"});
@@ -199,7 +197,8 @@ void SyntaxRegistry::RegisterBuiltinGrammars() noexcept {
         LanguageSyntax lang_html;
         lang_html.m_name = "html";
 
-        std::string pat_html_comment;
+        // FIX: Properly initialize pat_html_comment pattern string
+        std::string pat_html_comment = R"(())";
         lang_html.m_rules.push_back(SyntaxRule{.m_pattern_string = pat_html_comment,
                                                .m_compiled_pattern = boost::regex(pat_html_comment),
                                                .m_replacement_format = "\x03$1\x04"});

@@ -1,25 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>org.magpiny.malama</id>
+  <name>Malama</name>
+  <summary>Native Linux chat client for local Ollama LLMs</summary>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
-  <name>Malama</name>
-  <summary>Lightweight, native Linux GTK/wxWidgets desktop UI for local Ollama models</summary>
-  
+
   <description>
     <p>
-      Malama is a native Linux LLM chat frontend written in C++23 and wxWidgets.
-      It communicates directly with local Ollama instances with low RAM footprint compared to its peers.
+   Malama is a lightweight, native Linux desktop chat client built with C++23 and wxWidgets.
+
+    It connects directly to a local Ollama instance over TCP and provides a complete LLM chat 
+     workspace without Electron, an embedded browser engine, or a required external cloud service 
     </p>
+    <p>Features:</p>
+    <ul>
+      <li>Native desktop UI, no browser runtime required</li>
+      <li>Multimodal attachment support (PDF, DOCX, images)</li>
+      <li>Session tweaking and token budget tracking</li>
+      <li>Works entirely offline with local Ollama models</li>
+    </ul>
   </description>
 
   <launchable type="desktop-id">malama.desktop</launchable>
-  
+
   <url type="homepage">https://github.com/Magpiny/malama</url>
   <url type="bugtracker">https://github.com/Magpiny/malama/issues</url>
   <url type="vcs-browser">https://github.com/Magpiny/malama</url>
 
+  <developer id="dev.magpiny">
+    <name>Magpiny</name>
+  </developer>
+
+  <provides>
+    <binary>malama</binary>
+  </provides>
+
+  <content_rating type="oars-1.1"/>
+
   <releases>
-    <release version="0.3.0" date="2026-08-12"/>
+    <release version="0.3.0" date="2026-08-01"/>
   </releases>
+
+  <!--
+    TODO before AppImageHub submission:
+    - Add at least one <screenshot> block (AppImageHub requires this)
+    - Update the release date/version above on each tag
+    - Consider validating locally with: appstreamcli validate org.magpiny.malama.metainfo.xml
+  -->
 </component>

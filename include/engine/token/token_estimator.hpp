@@ -1,39 +1,35 @@
-/////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////
 // Name:        include/engine/token/token_estimator.hpp
-// Purpose:     Fast pre-flight context budget and attachment token estimator
+// Purpose:     Heuristic and BPE-based token payload estimator for LLM context
 // Author:      Wanjare S. <samuelwanjare@protonmail.com>
-// Created:     2026-08-10
+// Created:     2026-08-12
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
-/////////////////////////////////////////////////////////////////////////////
-
-#pragma once
+// /////////////////////////////////////////////////////////////////////////////
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include <cstdint>
+#pragma once
+
+#include <cstddef>
 #include <string_view>
 #include <vector>
 
 #include "core/models.hpp"
+#include "engine/storage/attachment_manager.hpp"
 
 namespace malama::engine::token {
 
-struct TokenBudgetStatus {
-    uint32_t m_estimated_tokens{0};
-    uint32_t m_context_limit{constants::max_chat_length};
-    float m_usage_percentage{0.0F};
-    bool m_is_overflow{false};
-};
-
 class TokenEstimator {
    public:
-    [[nodiscard]] static uint32_t estimate_text_tokens(std::string_view text) noexcept;
+    constexpr TokenEstimator() noexcept = default;
 
-    [[nodiscard]] static TokenBudgetStatus calculate_budget(
-        std::string_view user_prompt, std::string_view system_prompt,
-        const std::vector<core::Message> &history, uint32_t num_ctx,
-        uint32_t attachment_token_overhead = 0) noexcept;
+    [[nodiscard]] auto estimate_text_tokens(std::string_view text) const noexcept -> std::size_t;
+
+    [[nodiscard]] auto estimate_payload_tokens(
+        std::string_view current_prompt,
+        const std::vector<storage::AttachmentInfo> &pending_attachments,
+        const std::vector<core::Message> &history) const noexcept -> std::size_t;
 };
 
 }  // namespace malama::engine::token
