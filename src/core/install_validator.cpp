@@ -7,6 +7,7 @@
 // Licence:     GPL-3.0-or-later
 /////////////////////////////////////////////////////////////////////////////
 
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "core/install_validator.hpp"
 
 #include <cstdlib>

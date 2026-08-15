@@ -14,10 +14,12 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 #include <wx/frame.h>
 #include <wx/splitter.h>
 
 #include "common/types.hpp"
+#include "core/models.hpp"
 #include "engine/storage/history_manager.hpp"
 
 namespace malama::ui {
@@ -50,6 +52,8 @@ class MainFrame final : public wxFrame {
     [[nodiscard]] common::SessionParameters GetActiveSessionParameters() const noexcept {
         return m_current_session_params;
     }
+
+    [[nodiscard]] std::vector<core::Message> GetActiveSessionMessages() const noexcept;
 
    private:
     void setup_menu_bar() noexcept;

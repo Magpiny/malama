@@ -86,12 +86,19 @@ class MalamaApp final : public wxApp {
                     current_frame_ptr->AppendUserMessage(user_prompt);
                 }
 
-                if (m_worker_ptr != nullptr) {
+                if (m_worker_ptr != nullptr && current_frame_ptr != nullptr) {
                     const auto current_config = config::ConfigManager::get_instance().get_config();
+
+                    auto full_history = current_frame_ptr->GetActiveSessionMessages();
+                    std::vector<core::Message> history_without_current_turn;
+                    if (!full_history.empty()) {
+                        history_without_current_turn.assign(full_history.begin(),
+                                                            full_history.end() - 1);
+                    }
 
                     m_worker_ptr->InitializeGeneration(
                         current_config.m_engine.m_active_model, user_prompt,
-                        std::vector<core::Message>{},
+                        history_without_current_turn,
                         [](std::string_view parsed_token, bool is_final) mutable {
                             auto *event_ptr =
                                 new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN);

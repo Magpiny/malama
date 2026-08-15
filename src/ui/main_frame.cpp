@@ -1,15 +1,14 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/ui/main_frame.cpp
 // Purpose:     Implements top-level window controls and menu modal dialog loops
-// Author:      Wanjare S <samuelwanjare@proton.me>
+// Author:      Wanjare S. <samuelwanjare@proton.me>
 // Created:     2026-06-15
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 #include "ui/main_frame.hpp"
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <algorithm>
 #include <chrono>
@@ -37,6 +36,30 @@
 #include "ui/session_params_dlg.hpp"
 #include "ui/settings_dialog.hpp"
 #include "ui/sidebar_panel.hpp"
+
+namespace {
+
+[[nodiscard]] malama::common::SessionParameters to_common_params(
+    const malama::core::ModelParameters &params) noexcept {
+    return malama::common::SessionParameters{.m_temperature = params.m_temperature,
+                                             .m_top_p = params.m_top_p,
+                                             .m_top_k = static_cast<int>(params.m_top_k),
+                                             .m_repeat_penalty = params.m_repeat_penalty,
+                                             .m_num_ctx = params.m_num_ctx,
+                                             .m_system_prompt = params.m_system_prompt};
+}
+
+[[nodiscard]] malama::core::ModelParameters to_core_params(
+    const malama::common::SessionParameters &params) noexcept {
+    return malama::core::ModelParameters{.m_temperature = params.m_temperature,
+                                         .m_top_p = params.m_top_p,
+                                         .m_top_k = static_cast<std::int32_t>(params.m_top_k),
+                                         .m_repeat_penalty = params.m_repeat_penalty,
+                                         .m_num_ctx = params.m_num_ctx,
+                                         .m_system_prompt = params.m_system_prompt};
+}
+
+}  // namespace
 
 namespace malama::ui {
 using std::filesystem::path;
@@ -231,6 +254,7 @@ void MainFrame::LoadMostRecentSessionOnStartup() noexcept {
     auto active_session = m_history_manager_ptr->LoadSession(m_current_session_id);
 
     if (active_session.has_value() && m_chat_panel_ptr != nullptr) {
+        m_current_session_params = to_common_params(active_session->m_metadata.m_parameters);
         m_chat_panel_ptr->load_history(active_session.value());
 
         if (m_sidebar_panel_ptr != nullptr) {
@@ -333,6 +357,7 @@ void MainFrame::on_load_session(wxCommandEvent &event) noexcept {
     if (m_history_manager_ptr && (m_chat_panel_ptr != nullptr)) {
         auto session_opt = m_history_manager_ptr->LoadSession(m_current_session_id);
         if (session_opt.has_value()) {
+            m_current_session_params = to_common_params(session_opt->m_metadata.m_parameters);
             m_chat_panel_ptr->load_history(session_opt.value());
         }
     }
@@ -372,9 +397,28 @@ void MainFrame::on_preferences_action(wxCommandEvent &WXUNUSED(event)) noexcept 
 }
 
 void MainFrame::on_session_params_action(wxCommandEvent &WXUNUSED(event)) noexcept {
+    if (m_chat_panel_ptr != nullptr) {
+        const auto &active_session = m_chat_panel_ptr->get_active_session();
+        if (!active_session.m_metadata.m_session_id.empty()) {
+            m_current_session_params = to_common_params(active_session.m_metadata.m_parameters);
+        }
+    }
+
     SessionParamsDialog dialog(this, m_current_session_params);
     if (dialog.ShowModal() == wxID_OK) {
         m_current_session_params = dialog.GetParameters();
+
+        // 1. Update live ChatPanel in-memory session parameters
+        if (m_chat_panel_ptr != nullptr) {
+            m_chat_panel_ptr->set_session_parameters(m_current_session_params);
+        }
+
+        // 2. Persist updated parameters to SQLite database via core::ModelParameters conversion
+        if (m_history_manager_ptr != nullptr && !m_current_session_id.empty()) {
+            m_history_manager_ptr->UpdateSessionParameters(
+                m_current_session_id, to_core_params(m_current_session_params));
+        }
+
         spdlog::info("Updated thread session parameters: temperature={:.2f}, num_ctx={}",
                      m_current_session_params.m_temperature, m_current_session_params.m_num_ctx);
     }
@@ -394,7 +438,6 @@ void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     info.SetWebSite(wxT("https://magpiny.dev"));
     info.AddDeveloper(wxT("Wanjare Samuel"));
 
-    // Attempt to load the application logo with fallbacks for dev/build & installed environments
     wxIcon logo_icon;
     if (wxFileExists(wxT("assets/malama.png"))) {
         logo_icon.LoadFile(wxT("assets/malama.png"), wxBITMAP_TYPE_PNG);
@@ -511,6 +554,10 @@ void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
         auto new_session = m_history_manager_ptr->CreateSession(default_title);
         m_current_session_id = new_session.m_session_id;
 
+        // Persist tuned parameters to newly created session
+        m_history_manager_ptr->UpdateSessionParameters(m_current_session_id,
+                                                       to_core_params(m_current_session_params));
+
         if (m_sidebar_panel_ptr != nullptr) {
             m_sidebar_panel_ptr->populate_sidebar();
             m_sidebar_panel_ptr->select_session_by_id(m_current_session_id);
@@ -533,9 +580,17 @@ void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
 
 void MainFrame::on_new_chat_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     m_current_session_id.clear();
+    m_current_session_params = common::SessionParameters{};
     if (m_chat_panel_ptr != nullptr) {
         m_chat_panel_ptr->load_history(core::ChatSession{});
     }
+}
+
+auto MainFrame::GetActiveSessionMessages() const noexcept -> std::vector<core::Message> {
+    if (m_chat_panel_ptr == nullptr) {
+        return {};
+    }
+    return m_chat_panel_ptr->get_active_session().m_messages;
 }
 
 void MainFrame::on_export_session_action(wxCommandEvent &WXUNUSED(event)) {
