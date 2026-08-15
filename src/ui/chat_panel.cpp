@@ -35,6 +35,7 @@
 #include "common/constants.hpp"
 #include "config/config_manager.hpp"
 #include "engine/markdown/pipeline.hpp"
+#include "engine/storage/history_manager.hpp"
 #include "network/base64.hpp"
 
 namespace malama::ui {
@@ -67,9 +68,9 @@ inline constexpr int nibble_bit_shift = 4;
     std::string decoded_string;
     decoded_string.reserve(hex_payload.size() / 2UZ);
 
-    for (std::size_t index = 0; index + 1 < hex_payload.size(); index += 2) {
+    for (std::size_t index = 0UZ; index + 1UZ < hex_payload.size(); index += 2UZ) {
         const int high_value = get_hex_value(hex_payload[index]);
-        const int low_value = get_hex_value(hex_payload[index + 1]);
+        const int low_value = get_hex_value(hex_payload[index + 1UZ]);
 
         decoded_string.push_back(static_cast<char>((high_value << nibble_bit_shift) | low_value));
     }
@@ -163,6 +164,17 @@ void ChatPanel::setup_layout() noexcept {
     return m_active_session;
 }
 
+void ChatPanel::set_session_parameters(const common::SessionParameters &params) noexcept {
+    m_active_session.m_metadata.m_parameters =
+        core::ModelParameters{.m_temperature = params.m_temperature,
+                              .m_top_p = params.m_top_p,
+                              .m_top_k = static_cast<int32_t>(params.m_top_k),
+                              .m_repeat_penalty = params.m_repeat_penalty,
+                              .m_num_ctx = static_cast<uint32_t>(params.m_num_ctx),
+                              .m_system_prompt = params.m_system_prompt};
+    update_token_budget_display();
+}
+
 void ChatPanel::update_token_budget_display() noexcept {
     if (m_token_budget_bar == nullptr) {
         return;
@@ -180,7 +192,13 @@ void ChatPanel::update_token_budget_display() noexcept {
     std::size_t estimated_tokens = m_token_estimator.estimate_payload_tokens(
         current_prompt, pending_attachments, m_active_session.m_messages);
 
-    // 2. Add tokens from live active response stream
+    // 2. Include custom system prompt token weight if configured
+    const auto &sys_prompt = m_active_session.m_metadata.m_parameters.m_system_prompt;
+    if (!sys_prompt.empty()) {
+        estimated_tokens += m_token_estimator.estimate_text_tokens(sys_prompt);
+    }
+
+    // 3. Add tokens from live active response stream
     if (!m_active_response_stream.empty()) {
         estimated_tokens += m_token_estimator.estimate_text_tokens(m_active_response_stream);
     }
@@ -190,10 +208,10 @@ void ChatPanel::update_token_budget_display() noexcept {
         num_ctx_limit = 4096UZ;  // Fallback default context window limit
     }
 
-    // 3. Update Visual Budget Bar
+    // 4. Update Visual Budget Bar
     m_token_budget_bar->UpdateUsage(estimated_tokens, num_ctx_limit);
 
-    // 4. Update Error Banner alert
+    // 5. Update Error Banner alert
     if (m_error_banner_ptr != nullptr) {
         if (estimated_tokens >= num_ctx_limit) {
             m_error_banner_ptr->ShowAlert(
@@ -220,7 +238,11 @@ void ChatPanel::append_user_message(std::string_view message) noexcept {
         m_raw_markdown_history += "\n" + m_active_response_stream + "\n\n---";
 
         m_active_session.m_messages.push_back(
-            {.m_role = core::MessageRole::Assistant, .m_content = m_active_response_stream});
+            core::Message{.m_id = engine::storage::HistoryManager::GenerateUuidString(),
+                          .m_role = core::MessageRole::Assistant,
+                          .m_content = m_active_response_stream,
+                          .m_timestamp = engine::storage::HistoryManager::GetCurrentEpoch(),
+                          .m_is_starred = false});
         m_active_response_stream.clear();
     }
 
@@ -234,7 +256,11 @@ void ChatPanel::append_user_message(std::string_view message) noexcept {
 
     // Save user message directly into session history
     m_active_session.m_messages.push_back(
-        {.m_role = core::MessageRole::User, .m_content = lookahead_match});
+        core::Message{.m_id = engine::storage::HistoryManager::GenerateUuidString(),
+                      .m_role = core::MessageRole::User,
+                      .m_content = lookahead_match,
+                      .m_timestamp = engine::storage::HistoryManager::GetCurrentEpoch(),
+                      .m_is_starred = false});
 
     m_raw_markdown_history += "\n\n### 👤 User\n" + lookahead_match + "\n\n### 🤖 malama\n";
     render_chat_stream();

@@ -89,11 +89,11 @@ struct ChatSession {
  * @brief Configuration parameters for a single LLM session thread.
  */
 struct SessionParameters {
-    float m_temperature{0.7f};
-    float m_top_p{0.9f};
-    int32_t m_top_k{40};
-    float m_repeat_penalty{1.1f};
-    uint32_t m_num_ctx{32000};
+    float m_temperature{constants::chat_temperature};
+    float m_top_p{constants::top_p};
+    int32_t m_top_k{constants::top_k};
+    float m_repeat_penalty{constants::rpt_penalty};
+    uint32_t m_num_ctx{constants::max_chat_length};
     std::string m_system_prompt{};
 };
 

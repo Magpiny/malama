@@ -20,6 +20,7 @@
 #include <wx/panel.h>
 #include <wx/textctrl.h>
 
+#include "common/types.hpp"
 #include "core/models.hpp"
 #include "engine/storage/attachment_manager.hpp"
 #include "engine/token/token_estimator.hpp"
@@ -46,6 +47,9 @@ class ChatPanel final : public wxPanel {
     void append_token(std::string_view token_segment) noexcept;
     void append_user_message(std::string_view message) noexcept;
     void load_history(const core::ChatSession &session) noexcept;
+    /// @brief Dynamically applies parameter configuration changes (e.g., system prompt,
+    /// temperature, num_ctx)
+    void set_session_parameters(const common::SessionParameters &params) noexcept;
     [[nodiscard]] auto get_active_response_stream() const noexcept -> std::string;
     [[nodiscard]] auto get_active_session() const noexcept -> const core::ChatSession &;
 

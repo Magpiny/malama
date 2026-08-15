@@ -1,15 +1,14 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/core/i_config_manager.hpp
 // Purpose:     Pure abstract boundary interface for application configurations
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare <samuelwanjare@protonmail.com>
 // Created:     2026-06-06
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     Apache-2.0
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <expected>
 

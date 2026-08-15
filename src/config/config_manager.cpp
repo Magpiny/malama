@@ -11,6 +11,8 @@
 
 #include "config/config_manager.hpp"
 
+#include <spdlog/spdlog.h>
+
 namespace malama::config {
 
 auto ConfigManager::get_instance() noexcept -> ConfigManager & {
@@ -21,16 +23,25 @@ auto ConfigManager::get_instance() noexcept -> ConfigManager & {
 auto ConfigManager::load_config(const std::string &filepath) noexcept -> void {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::string buffer;
+
     if (auto err = glz::read_file_json(m_current_config, filepath, buffer)) {
-        // Automatically rewrite updated binary defaults on standard parsing failures
+        spdlog::warn("Failed to parse config file: {}. Auto-writing default configuration.",
+                     filepath);
         [[maybe_unused]] auto write_err = glz::write_file_json(m_current_config, filepath, buffer);
+    } else {
+        spdlog::info("Successfully loaded application configuration from {}", filepath);
     }
 }
 
 auto ConfigManager::save_config(const std::string &filepath) noexcept -> void {
     std::lock_guard<std::mutex> lock(m_mutex);
     std::string buffer;
-    [[maybe_unused]] auto err = glz::write_file_json(m_current_config, filepath, buffer);
+
+    if (auto err = glz::write_file_json(m_current_config, filepath, buffer)) {
+        spdlog::error("Failed to persist application configuration to disk: {}", filepath);
+    } else {
+        spdlog::info("Application configuration successfully written to {}", filepath);
+    }
 }
 
 auto ConfigManager::get_config() const noexcept -> AppConfig {
@@ -38,20 +49,32 @@ auto ConfigManager::get_config() const noexcept -> AppConfig {
     return m_current_config;
 }
 
-auto ConfigManager::update_config(const AppConfig &new_config) noexcept -> void {
+auto ConfigManager::update_config(const AppConfig &new_config, const std::string &filepath) noexcept
+    -> void {
+    std::vector<observer_callback> observers_snapshot;
     {
         std::lock_guard<std::mutex> lock(m_mutex);
         m_current_config = new_config;
+
+        std::string buffer;
+        [[maybe_unused]] auto write_err = glz::write_file_json(m_current_config, filepath, buffer);
+        observers_snapshot = m_observers;
     }
-    for (const auto &observer : m_observers) {
-        observer(m_current_config);
+
+    for (const auto &observer : observers_snapshot) {
+        if (observer) {
+            observer(new_config);
+        }
     }
 }
 
 auto ConfigManager::register_observer(observer_callback callback) noexcept -> void {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_observers.push_back(std::move(callback));
-    m_observers.back()(m_current_config);
+    m_observers.push_back(callback);
+
+    if (callback) {
+        callback(m_current_config);
+    }
 }
 
 }  // namespace malama::config

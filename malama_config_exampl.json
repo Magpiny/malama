@@ -1,1 +1,24 @@
-{"engine":{"host":"127.0.0.1","port":"11434","active_model":"gemma4:e4b","thinking_enabled":false},"appearance":{"theme_name":"dark_maroon","bg_color":"#2d0309","surface_color":"#420912","text_primary":"#f5f5f7","text_accent":"#c4929a","code_bg":"#1a0105","code_keyword":"#ff7b72","code_string":"#a5d6ff","code_type":"#d2a8ff","code_comment":"#8b949e","code_line_num":"#666666"},"interaction":{"typewriter_delay_ms":5}}
+{
+    "engine": {
+        "host": "127.0.0.1",
+        "port": "11434",
+        "active_model": "gemma4:e4b",
+        "thinking_enabled": false
+    },
+    "appearance": {
+        "theme_name": "dark_maroon",
+        "bg_color": "#2d0309",
+        "surface_color": "#420912",
+        "text_primary": "#f5f5f7",
+        "text_accent": "#c4929a",
+        "code_bg": "#1a0105",
+        "code_keyword": "#ff7b72",
+        "code_string": "#a5d6ff",
+        "code_type": "#d2a8ff",
+        "code_comment": "#8b949e",
+        "code_line_num": "#666666"
+    },
+    "interaction": {
+        "typewriter_delay_ms": 5
+    }
+}

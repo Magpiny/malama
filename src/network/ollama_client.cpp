@@ -1,11 +1,13 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        src/network/ollama_client.cpp
 // Purpose:     Implements stackless awaitable loops with chunk parsing boundaries
-// Author:      Wanjare S<samuelwanjare@protonmail.com>
+// Author:      Wanjare S. <samuelwanjare@protonmail.com>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
-// Licence:     GPL-V3-or-later
+// Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "network/ollama_client.hpp"
 
@@ -17,6 +19,9 @@
 #include <format>
 #include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
+
+#include "common/constants.hpp"
+#include "network/ollama_requests.hpp"
 
 namespace malama::network {
 
@@ -56,8 +61,8 @@ auto OllamaClient::CheckCache(const std::string &cache_key) noexcept -> std::opt
     return std::nullopt;
 }
 
-auto OllamaClient::UpdateCache(const std::string &cache_key,
-                               const std::string &response_value) noexcept -> void {
+void OllamaClient::UpdateCache(const std::string &cache_key,
+                               const std::string &response_value) noexcept {
     if (m_cache_store.m_lookup_table.size() >= ResponseCache::max_cache_entries) {
         std::string oldest_key = m_cache_store.m_access_order.front();
         m_cache_store.m_lookup_table.erase(oldest_key);
@@ -67,8 +72,99 @@ auto OllamaClient::UpdateCache(const std::string &cache_key,
     m_cache_store.m_access_order.push_back(cache_key);
 }
 
-auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_view prompt_text,
-                                     const std::vector<std::string> &images_payload,
+auto OllamaClient::PrepareHttpRequest(std::string model_name,
+                                      const std::vector<core::Message> &history,
+                                      std::string prompt_text,
+                                      const common::SessionParameters &params,
+                                      std::vector<std::string> images_payload) const noexcept
+    -> boost::beast::http::request<boost::beast::http::string_body> {
+    std::vector<ChatMessagePayload> chat_messages;
+
+    if (!params.m_system_prompt.empty()) {
+        chat_messages.push_back(ChatMessagePayload{
+            .m_role = "system", .m_content = params.m_system_prompt, .m_images = {}});
+    }
+
+    // Replay prior turns so the model has conversational context.
+    for (const auto &msg : history) {
+        std::string role;
+        switch (msg.m_role) {
+            case core::MessageRole::User:
+                role = "user";
+                break;
+            case core::MessageRole::Assistant:
+                role = "assistant";
+                break;
+            case core::MessageRole::System:
+                role = "system";
+                break;
+        }
+        chat_messages.push_back(ChatMessagePayload{
+            .m_role = std::move(role), .m_content = msg.m_content, .m_images = {}});
+    }
+
+    chat_messages.push_back(ChatMessagePayload{.m_role = "user",
+                                               .m_content = std::move(prompt_text),
+                                               .m_images = std::move(images_payload)});
+
+    OllamaChatRequest payload{.m_model = std::move(model_name),
+                              .m_messages = std::move(chat_messages),
+                              .m_stream = true,
+                              .m_options = {.m_temperature = params.m_temperature,
+                                            .m_top_p = params.m_top_p,
+                                            .m_top_k = params.m_top_k,
+                                            .m_repeat_penalty = params.m_repeat_penalty,
+                                            .m_num_ctx = params.m_num_ctx}};
+
+    std::string json_body;
+    [[maybe_unused]] const auto write_error = glz::write_json(payload, json_body);
+
+    boost::beast::http::request<boost::beast::http::string_body> request_packet{
+        boost::beast::http::verb::post, "/api/chat", constants::http_version_1_1};
+    request_packet.set(boost::beast::http::field::host, m_host);
+    request_packet.set(boost::beast::http::field::content_type, "application/json");
+    request_packet.body() = std::move(json_body);
+    request_packet.prepare_payload();
+
+    return request_packet;
+}
+
+void OllamaClient::ParseStreamAccumulator(
+    const std::function<void(std::string_view)> &token_callback,
+    std::string &complete_stream_accumulation) noexcept {
+    std::size_t newline_position = 0;
+    while ((newline_position = m_residual_line_accumulator.find('\n')) != std::string::npos) {
+        std::string_view zero_copy_line_view(m_residual_line_accumulator.data(), newline_position);
+
+        if (!zero_copy_line_view.empty() && zero_copy_line_view.front() == '{') {
+            ResponseChunk chunk;
+            auto parser_error =
+                glz::read<glz::opts{.error_on_unknown_keys = false}>(chunk, zero_copy_line_view);
+
+            if (!parser_error && token_callback) {
+                token_callback(chunk.m_message.m_content);
+                complete_stream_accumulation += chunk.m_message.m_content;
+            }
+        }
+        m_residual_line_accumulator.erase(0, newline_position + 1);
+    }
+}
+
+auto OllamaClient::ExecuteStreamTask(std::string model_name,
+                                     const std::vector<core::Message> &history,
+                                     std::string prompt_text,
+                                     std::vector<std::string> images_payload,
+                                     std::function<void(std::string_view)> token_callback) noexcept
+    -> boost::cobalt::task<std::expected<void, common::NetworkError>> {
+    co_return co_await ExecuteStreamTask(std::move(model_name), history, std::move(prompt_text),
+                                         common::SessionParameters{}, std::move(images_payload),
+                                         std::move(token_callback));
+}
+
+auto OllamaClient::ExecuteStreamTask(std::string model_name,
+                                     const std::vector<core::Message> &history,
+                                     std::string prompt_text, common::SessionParameters params,
+                                     std::vector<std::string> images_payload,
                                      std::function<void(std::string_view)> token_callback) noexcept
     -> boost::cobalt::task<std::expected<void, common::NetworkError>> {
     if (m_is_streaming.load()) {
@@ -78,10 +174,12 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
     m_cancellation_requested.store(false);
     m_residual_line_accumulator.clear();
 
-    std::string cache_key = std::format("{}:{}", model_name, prompt_text);
-    auto cached_response = CheckCache(cache_key);
-    if (cached_response.has_value() && token_callback) {
-        token_callback(cached_response.value());
+    const std::string cache_key =
+        std::format("{}:{}:{}", model_name, prompt_text, params.m_system_prompt);
+    if (auto cached_response = CheckCache(cache_key); cached_response.has_value()) {
+        if (token_callback) {
+            token_callback(cached_response.value());
+        }
         co_return std::expected<void, common::NetworkError>{};
     }
 
@@ -98,21 +196,8 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
     boost::beast::tcp_stream stream(executor);
     co_await stream.async_connect(std::get<1>(endpoints_result), boost::asio::as_tuple);
 
-    MultimodalPayload payload{.m_model = std::string(model_name),
-                              .m_prompt = std::string(prompt_text),
-                              .m_stream = true,
-                              .m_images = images_payload};
-
-    std::string json_body;
-    [[maybe_unused]] const auto write_error = glz::write_json(payload, json_body);
-
-    boost::beast::http::request<boost::beast::http::string_body> request_packet{
-        boost::beast::http::verb::post, "/api/generate", 11};
-    request_packet.set(boost::beast::http::field::host, m_host);
-    request_packet.set(boost::beast::http::field::content_type, "application/json");
-    request_packet.body() = json_body;
-    request_packet.prepare_payload();
-
+    auto request_packet =
+        PrepareHttpRequest(model_name, history, prompt_text, params, std::move(images_payload));
     co_await boost::beast::http::async_write(stream, request_packet, boost::asio::as_tuple);
 
     boost::beast::flat_buffer static_buffer;
@@ -124,7 +209,6 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
 
     std::string complete_stream_accumulation;
     while (!response_parser.is_done()) {
-        // Intercept loops securely if user requests cancellation
         if (m_cancellation_requested.load()) {
             if (token_callback) {
                 token_callback("\n\n[Prompt generation stopped by the user.]");
@@ -139,29 +223,9 @@ auto OllamaClient::ExecuteStreamTask(std::string_view model_name, std::string_vi
         if (bytes_transferred > 0) {
             auto &body_chunk = response_parser.get().body();
             if (!body_chunk.empty()) {
-                // FIXED: Append incoming frames directly to our loopahead buffer
                 m_residual_line_accumulator.append(body_chunk);
                 body_chunk.clear();
-
-                std::size_t newline_position = 0;
-                while ((newline_position = m_residual_line_accumulator.find('\n')) !=
-                       std::string::npos) {
-                    // Create zero-copy views to parse lines without temporary string copies
-                    std::string_view zero_copy_line_view(m_residual_line_accumulator.data(),
-                                                         newline_position);
-
-                    if (!zero_copy_line_view.empty() && zero_copy_line_view.front() == '{') {
-                        ResponseChunk chunk;
-                        auto parser_error = glz::read<glz::opts{.error_on_unknown_keys = false}>(
-                            chunk, zero_copy_line_view);
-
-                        if (!parser_error && token_callback) {
-                            token_callback(chunk.m_response);
-                            complete_stream_accumulation += chunk.m_response;
-                        }
-                    }
-                    m_residual_line_accumulator.erase(0, newline_position + 1);
-                }
+                ParseStreamAccumulator(token_callback, complete_stream_accumulation);
             }
         }
 

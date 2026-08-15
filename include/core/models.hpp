@@ -41,7 +41,7 @@ struct ModelParameters {
 };
 
 struct Message {
-    std::string m_id;
+    std::string m_id{"0"};
     MessageRole m_role;
     std::string m_content;
     uint64_t m_timestamp{0};

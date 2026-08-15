@@ -8,10 +8,10 @@
 /////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <expected>
 #include <filesystem>
-#include <string>
 
 namespace malama::core {
 

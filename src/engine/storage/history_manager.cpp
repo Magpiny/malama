@@ -11,7 +11,6 @@
 
 #include "engine/storage/history_manager.hpp"
 
-#include <algorithm>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
