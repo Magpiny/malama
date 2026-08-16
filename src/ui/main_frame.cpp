@@ -431,7 +431,7 @@ void MainFrame::on_exit_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     wxAboutDialogInfo info;
     info.SetName(_("Malama"));
-    info.SetVersion(_("0.3.0"));
+    info.SetVersion(_("0.3.1"));
     info.SetDescription(
         wxT("Native Linux chat client for local LLMs — no cloud, no browser, no compromise."));
     info.SetCopyright(wxT("Copyright (C) 2026"));

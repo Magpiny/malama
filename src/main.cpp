@@ -99,6 +99,7 @@ class MalamaApp final : public wxApp {
                     m_worker_ptr->InitializeGeneration(
                         current_config.m_engine.m_active_model, user_prompt,
                         history_without_current_turn,
+                        current_frame_ptr->GetActiveSessionParameters(),
                         [](std::string_view parsed_token, bool is_final) mutable {
                             auto *event_ptr =
                                 new (std::nothrow) wxThreadEvent(ui::EVT_MALAMA_TOKEN);

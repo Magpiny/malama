@@ -6,32 +6,30 @@
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
-
 #pragma once
+// SPDX-License-Identifier: GPL-3.0-or-later
 
 #include <functional>
 #include <memory>
-#include <string>
 #include <string_view>
 #include <vector>
 
+#include "common/types.hpp"
 #include "core/models.hpp"
 #include "network/ollama_client.hpp"
 
 namespace malama::network {
-
 class StreamWorker final {
    public:
     explicit StreamWorker(std::unique_ptr<OllamaClient> client_ptr) noexcept;
     ~StreamWorker() = default;
-
     StreamWorker(const StreamWorker &) = delete;
     auto operator=(const StreamWorker &) -> StreamWorker & = delete;
     StreamWorker(StreamWorker &&) noexcept = default;
     auto operator=(StreamWorker &&) noexcept -> StreamWorker & = default;
-
     auto InitializeGeneration(std::string_view model_name, std::string_view prompt_text,
                               const std::vector<core::Message> &history_context,
+                              common::SessionParameters params,
                               std::function<void(std::string_view, bool)> token_callback) noexcept
         -> void;
 
@@ -39,5 +37,4 @@ class StreamWorker final {
     std::unique_ptr<OllamaClient> m_client_ptr;
     std::function<void(std::string_view, bool)> m_token_callback;
 };
-
 }  // namespace malama::network

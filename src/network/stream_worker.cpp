@@ -6,6 +6,8 @@
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
 // /////////////////////////////////////////////////////////////////////////////
+
+// SPDX-License-Identifier: GPL-3.0-or-later
 #include "network/stream_worker.hpp"
 
 #include <boost/asio/detached.hpp>
@@ -15,19 +17,24 @@
 
 #include "config/config_manager.hpp"
 #include "network/base64.hpp"
+
 namespace malama::network {
 inline constexpr std::size_t think_open_tag_length = 7UZ;
 inline constexpr std::size_t think_close_tag_length = 8UZ;
+
 StreamWorker::StreamWorker(std::unique_ptr<OllamaClient> client_ptr) noexcept
     : m_client_ptr(std::move(client_ptr)) {}
+
 auto RunCobaltTask(OllamaClient *client_ptr, std::string model_name,
                    std::vector<core::Message> history, std::string prompt_text,
-                   std::vector<std::string> images_payload, bool thinking_enabled,
+                   common::SessionParameters params, std::vector<std::string> images_payload,
+                   bool thinking_enabled,
                    std::function<void(std::string_view, bool)> token_callback)
     -> boost::cobalt::task<void> {
     bool is_inside_thinking_block = false;
+
     static_cast<void>(co_await client_ptr->ExecuteStreamTask(
-        model_name, history, prompt_text, images_payload,
+        model_name, history, prompt_text, params, images_payload,
         [token_callback, thinking_enabled, &is_inside_thinking_block](std::string_view token) {
             if (!token_callback) {
                 return;
@@ -67,9 +74,10 @@ auto RunCobaltTask(OllamaClient *client_ptr, std::string model_name,
     }
     co_return;
 }
+
 auto StreamWorker::InitializeGeneration(
     std::string_view model_name, std::string_view prompt_text,
-    const std::vector<core::Message> &history_context,
+    const std::vector<core::Message> &history_context, common::SessionParameters params,
     std::function<void(std::string_view, bool)> token_callback) noexcept -> void {
     m_token_callback = std::move(token_callback);
     spdlog::debug("Cobalt workspace stream task initialized for reasoning validation pipelines.");
@@ -82,7 +90,7 @@ auto StreamWorker::InitializeGeneration(
             m_client_ptr->GetExecutor(),
             RunCobaltTask(m_client_ptr.get(), std::string(model_name),
                           std::vector<core::Message>(history_context), std::string(prompt_text),
-                          std::move(images_payload), thinking_enabled, m_token_callback),
+                          params, std::move(images_payload), thinking_enabled, m_token_callback),
             boost::asio::detached);
     }
 }
