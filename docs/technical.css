@@ -1,0 +1,133 @@
+/* ==========================================================================
+   Malama Technical Documentation Extensions (technical.css)
+   Complements malama.css using project colors (#f5f5f7, #282c34, #c4929a)
+   ========================================================================== */
+
+/* Navbar Developer Indicator Badge */
+.nav-tech-badge {
+  font-size: 0.75rem;
+  background-color: var(--accent);
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  vertical-align: middle;
+}
+
+/* Technical Hero Styling */
+.technical-hero {
+  background: linear-gradient(180deg, var(--bg-primary) 0%, #e9e9ee 100%);
+  border-bottom: 1px solid var(--border-light);
+  padding: 80px 0 60px 0;
+}
+
+/* Technical Content Cards */
+.tech-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  padding: 28px;
+  box-shadow: var(--shadow-sm);
+}
+
+.tech-card h3 {
+  font-size: 1.2rem;
+  color: var(--bg-dark);
+  margin-bottom: 12px;
+}
+
+.tech-card p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.tech-card code {
+  background-color: rgba(40, 44, 52, 0.06);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #e06c75;
+  font-size: 0.85rem;
+}
+
+/* Directory Tree Container Box */
+.directory-tree-block {
+  background-color: var(--bg-dark) !important;
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--border-dark) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.directory-tree-block code {
+  color: #abb2bf !important;
+  font-size: 0.88rem !important;
+  line-height: 1.5 !important;
+}
+
+/* Doxygen Notice Callout */
+.doxygen-callout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--accent);
+  border-left: 6px solid var(--accent);
+  border-radius: var(--radius-md);
+  padding: 20px 28px;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.doxygen-callout .callout-content strong {
+  font-size: 1.05rem;
+  color: var(--bg-dark);
+}
+
+.doxygen-callout .callout-content p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Utility Layout Classes */
+.margin-top-12 { margin-top: 12px; }
+.margin-top-30 { margin-top: 30px; }
+
+.compact-block {
+  padding: 10px 16px !important;
+}
+
+.compact-block code {
+  font-size: 0.82rem !important;
+}
+
+/* Table Enhancements for Code Reference */
+.spec-table td code {
+  background-color: var(--bg-primary);
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--bg-dark);
+  font-weight: 600;
+}
+
+/* Responsive Media Queries for Technical Components */
+@media (max-width: 768px) {
+  .doxygen-callout {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* Code Block Header Labels */
+.code-header {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--accent);
+  padding: 8px 16px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border-dark);
+  border-top-left-radius: var(--radius-md);
+  border-top-right-radius: var(--radius-md);
+}

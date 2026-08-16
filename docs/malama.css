@@ -838,3 +838,38 @@ code, pre {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   Developer Documentation Button Extensions (malama.css)
+   ========================================================================== */
+
+/* Navbar Navigation Tech Button */
+.tech-btn {
+  padding: 8px 14px;
+  background-color: var(--accent-light);
+  color: var(--bg-dark) !important;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.tech-btn:hover {
+  background-color: var(--accent);
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(196, 146, 154, 0.3);
+}
+
+/* Hero Section Outline Tech Button */
+.btn-outline-tech {
+  background-color: transparent;
+  color: var(--bg-dark);
+  border: 1px solid var(--accent);
+}
+
+.btn-outline-tech:hover {
+  background-color: var(--accent-light);
+  color: var(--bg-dark);
+  border-color: var(--accent-hover);
+}

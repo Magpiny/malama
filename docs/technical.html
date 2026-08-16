@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Malama — C++23 Core Internals & Architecture Specifications</title>
+
+  <!-- Favicon / Address Bar Icon -->
+  <link rel="icon" type="image/jpeg" href="./screenshots/malama.jpg" />
+  
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- CSS Bundles -->
+  <link rel="stylesheet" href="malama.css" />
+  <link rel="stylesheet" href="technical.css" />
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="index.html#hero" class="nav-brand">
+        <img src="./screenshots/malama.jpg" alt="Malama Logo" class="brand-logo" />
+        <span class="brand-name">Malama <span class="nav-tech-badge">DevDocs</span></span>
+      </a>
+      <nav class="nav-links">
+        <a href="index.html">User Portal</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#folder-structure">Repository Layout</a>
+        <a href="#class-matrix">Class Reference</a>
+        <a href="#coding-standards">Guidelines</a>
+        <a href="#build-cmake">CMake & Dependencies</a>
+        <a href="#testing-ci">CI/CD & QA</a>
+        <a href="https://github.com/Magpiny/malama" target="_blank" class="github-btn">GitHub</a>
+      </nav>
+      <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mobile Menu Navigation -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="index.html" class="mobile-link">User Portal</a>
+    <a href="#architecture" class="mobile-link">Architecture</a>
+    <a href="#folder-structure" class="mobile-link">Repository Layout</a>
+    <a href="#class-matrix" class="mobile-link">Class Reference</a>
+    <a href="#coding-standards" class="mobile-link">Guidelines</a>
+    <a href="#build-cmake" class="mobile-link">CMake & Dependencies</a>
+    <a href="#testing-ci" class="mobile-link">CI/CD & QA</a>
+    <a href="https://github.com/Magpiny/malama" target="_blank" class="mobile-link highlight">GitHub Repository</a>
+  </div>
+
+  <!-- Developer Hero Header -->
+  <section class="hero-section technical-hero">
+    <div class="hero-content">
+      <span class="hero-badge">C++23 • wxWidgets 3.3 • Boost.Asio • CMake 3.28</span>
+      <h1 class="hero-title">Core Engine Internals &<br><span class="accent-text">System Architecture Manual</span></h1>
+      <p class="hero-subtitle">
+        A comprehensive guide for open-source systems engineers and C++ contributors. Learn about our zero-allocation memory policies, async TCP event loops, and target-based CMake design.
+      </p>
+      <div class="hero-actions">
+        <a href="#architecture" class="btn btn-primary">Explore Internals</a>
+        <a href="https://magpiny.github.io/malama/doxygen/html/" target="_blank" class="btn btn-secondary">Open Doxygen API Docs ↗</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Architecture Subsystem Specification -->
+  <section id="architecture" class="section container">
+    <div class="section-header">
+      <h2>System Architecture & Thread Boundaries</h2>
+      <p>Decoupled multi-threaded design isolating asynchronous socket I/O from the native GTK rendering loop.</p>
+    </div>
+
+    <div class="grid grid-2 alignment-center">
+      <div class="tech-card">
+        <h3>1. Asynchronous Networking & Coroutines</h3>
+        <p>The network layer relies on <code>Boost.Asio</code> and <code>Boost.Cobalt</code> running inside a dedicated worker thread (<code>std::jthread</code>). Raw streaming LLM tokens are buffered and forwarded to the wxWidgets GUI thread via non-blocking <code>wxQueueEvent</code> dispatchers to keep UI framing strictly under 16ms.</p>
+      </div>
+      <div class="tech-card">
+        <h3>2. Compile-Time JSON Reflection</h3>
+        <p>Payload generation and response parsing bypass heavy runtime reflection trees by using the header-only <code>glaze</code> JSON library. The application parses lines in zero-copy chunks, providing high throughput while idling at less than 40 MB of RAM.</p>
+      </div>
+    </div>
+
+    <div class="grid grid-2 alignment-center margin-top-30">
+      <div class="tech-card">
+        <h3>3. Factory-Routed Multimodal Ingestion</h3>
+        <p>File attachments are staged in memory and processed by the <code>ParserFactory</code>. Uncompressed documents and images are read via <code>poppler-cpp</code>, <code>libarchive</code>, <code>pugixml</code>, <code>libpng</code>, and <code>libjpeg</code> before being converted to Base64 or UTF-8 prompt boundaries.</p>
+      </div>
+      <div class="tech-card">
+        <h3>4. Relational Persistence & State Guarding</h3>
+        <p>Conversations and metadata are stored in a local SQLite3 database. All queries use parameterized statements protected by scoped transaction guards across worker threads, preventing locks and corrupt state.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Repository Folder Structure -->
+  <section id="folder-structure" class="section bg-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Source Repository Layout</h2>
+        <p>Target-partitioned source tree separating pure domain business logic from GTK presentation components.</p>
+      </div>
+
+      <div class="code-block directory-tree-block">
+        <pre><code>malama/
+├── CMakeLists.txt                # Modern CMake root build file (generates compile_commands.json)
+├── .clang-format                 # Code style specification (attached braces, right-aligned pointers)
+├── .clang-tidy                   # Static analysis rules (enforces m_ prefixes and exception rules)
+├── include/                      # Public C++ header files
+│   ├── common/                   # Core types, constants, and domain data models (models.hpp, types.hpp)
+│   ├── config/                   # Thread-safe configuration manager (config_manager.hpp)
+│   ├── engine/                   # Business domain subsystems
+│   │   ├── markdown/             # Custom Markdown-to-HTML parser (pipeline.hpp, syntax_registry.hpp)
+│   │   └── storage/              # SQLite history manager and parser implementations
+│   ├── network/                  # TCP streaming wrappers (ollama_client.hpp, stream_worker.hpp)
+│   └── ui/                       # Native GTK/wxWidgets layout panels (main_frame.hpp, chat_panel.hpp)
+├── libs/                         # Vendor header-only dependencies (glaze, spdlog, boost subsets)
+├── src/                          # Implementation file source root (.cpp targets)
+├── scripts/                      # Deployment shell runners (install.sh, uninstall.sh, build_appimage.sh)
+└── tests/                        # Offline verification and unit testing suite
+    ├── CMakeLists.txt            # Isolated CTest builder file
+    ├── main_test.cpp             # Catch2 test suite entry point
+    ├── unit/                     # Domain and parsing logic unit tests
+    └── integration/              # Multi-module and containerized distro verification matrices</code></pre>
+        <button class="copy-code-btn">Copy Layout</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Detailed Class Overview Matrix -->
+  <section id="class-matrix" class="section container">
+    <div class="section-header">
+      <h2>Core Class Reference & System Roles</h2>
+      <p>Key C++ classes orchestrating application lifecycle, parsing pipelines, and UI interactions.</p>
+    </div>
+
+    <div class="table-responsive">
+      <table class="spec-table">
+        <thead>
+          <tr>
+            <th>Class Name</th>
+            <th>Header & Namespace Path</th>
+            <th>Core Role & Operational Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>MalamaApp</code></td>
+            <td><code>include/main.hpp</code><br><code>malama::MalamaApp</code></td>
+            <td>Application entry point inheriting from <code>wxApp</code>. Handles global initialization, spdlog setup, and initial window lifecycle.</td>
+          </tr>
+          <tr>
+            <td><code>MainFrame</code></td>
+            <td><code>include/ui/main_frame.hpp</code><br><code>malama::ui::MainFrame</code></td>
+            <td>Top-level window controller managing menus, layout sizing, modal dialog execution, and thread-safe custom event listeners.</td>
+          </tr>
+          <tr>
+            <td><code>OllamaClient</code></td>
+            <td><code>include/network/ollama_client.hpp</code><br><code>malama::network::OllamaClient</code></td>
+            <td>HTTP REST and TCP streaming wrapper using Boost.Asio to communicate with the local <code>ollama serve</code> daemon over non-blocking sockets.</td>
+          </tr>
+          <tr>
+            <td><code>StreamWorker</code></td>
+            <td><code>include/network/stream_worker.hpp</code><br><code>malama::network::StreamWorker</code></td>
+            <td>Dedicated background thread wrapper (<code>std::jthread</code>) that receives and processes chunked JSON responses into UI events.</td>
+          </tr>
+          <tr>
+            <td><code>AttachmentManager</code></td>
+            <td><code>include/engine/storage/attachment_manager.hpp</code><br><code>malama::engine::storage::AttachmentManager</code></td>
+            <td>Handles pre-flight staging, binary validation, Base64 conversion, and context tag wrapping for user attachments.</td>
+          </tr>
+          <tr>
+            <td><code>ParserFactory</code></td>
+            <td><code>include/engine/storage/parsers/parser_factory.hpp</code><br><code>malama::engine::storage::ParserFactory</code></td>
+            <td>Factory pattern implementation routing incoming files to the correct specialized document or image parser based on file extensions.</td>
+          </tr>
+          <tr>
+            <td><code>HistoryManager</code></td>
+            <td><code>include/engine/storage/history_manager.hpp</code><br><code>malama::engine::storage::HistoryManager</code></td>
+            <td>Provides persistent storage and retrieval for chat sessions, messages, and parameters using transactional SQLite3 queries.</td>
+          </tr>
+          <tr>
+            <td><code>Pipeline</code></td>
+            <td><code>include/engine/markdown/pipeline.hpp</code><br><code>malama::engine::markdown::Pipeline</code></td>
+            <td>High-speed Markdown-to-HTML transformation engine designed for incremental text updates with an LRU fragment cache.</td>
+          </tr>
+          <tr>
+            <td><code>TokenEstimator</code></td>
+            <td><code>include/engine/token_estimator.hpp</code><br><code>malama::engine::TokenEstimator</code></td>
+            <td>Calculates prompt and attachment token estimates prior to submission to prevent context window overflow.</td>
+          </tr>
+          <tr>
+            <td><code>ExportEngine</code></td>
+            <td><code>include/engine/export_engine.hpp</code><br><code>malama::engine::ExportEngine</code></td>
+            <td>Serializes chat history to disk in user-selected formats (.md, .json, .txt).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="doxygen-callout margin-top-30">
+      <div class="callout-content">
+        <strong>Need Complete Member Functions and Call Graphs?</strong>
+        <p>Generate full class diagrams, public methods, and call graphs using Doxygen:</p>
+      </div>
+      <div class="code-block compact-block">
+        <pre><code>doxygen Doxyfile && xdg-open doxygen/html/index.html</code></pre>
+        <button class="copy-code-btn">Copy</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Coding Standards & Design Language -->
+  <section id="coding-standards" class="section bg-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Magpiny C++23 Coding Guidelines</h2>
+        <p>Strict architectural constraints enforcing memory safety, readability, and modern C++ usage across the codebase.</p>
+    </div>
+
+    <div class="grid grid-2">
+        <div class="feature-card">
+            <h3>Standard File Header</h3>
+            <p>Every <code>.hpp</code> and <code>.cpp</code> file must begin with a standardized header containing the file path, purpose, author contact, creation date, copyright, and GPL-3.0-or-later license.</p>
+
+            <div class="code-block margin-top-30">
+                <div class="code-header">Standard C++ Source File Header Template</div>
+                <pre><code>                  // /////////////////////////////////////////////////////////////////////////////
+                    // Name:        src/engine/token/token_estimator.cpp
+                    // Purpose:     Implements token estimation heuristic calculations
+                    // Author:      Magpiny BO <magpinyb@proton.me>
+                    // Created:     2026-08-12
+                    // Copyright:   (c) 2026 Magpiny. All rights reserved.
+                    // Licence:     GPL-3.0-or-later
+                    // /////////////////////////////////////////////////////////////////////////////</code></pre>
+                <button class="copy-code-btn">Copy Template</button>
+            </div>
+          </div>
+    </div> 
+
+
+      <div class="grid grid-3 margin-top-30">
+
+          
+        <div class="feature-card">
+          <h3>Attached Brace Style</h3>
+          <p>K&R attached opening braces are enforced project-wide for all functions, control structures, and class declarations.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Explicit Naming</h3>
+          <p>Interfaces use an <code>I</code> prefix, member variables use <code>m_snake_case</code>, and short variable names (under 3 characters) are disallowed except for standard loop indices.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Right-Aligned Pointers</h3>
+          <p>Pointer and reference indicators are consistently aligned to the variable name (e.g., <code>Type *ptr_name</code>, <code>Type &ref_name</code>).</p>
+        </div>
+      </div>
+
+      <div class="grid grid-2 margin-top-30">
+        <div class="tech-card">
+          <h3>Zero Exceptions Policy</h3>
+          <p>The core library avoids C++ exceptions. Operations return <code>std::expected&lt;T, ErrorCode&gt;</code> to make error propagation explicit and non-throwing.</p>
+        </div>
+        <div class="tech-card">
+          <h3>Explicit Ownership</h3>
+          <p>Raw owning pointers are prohibited. Dynamic resource lifecycles are managed exclusively through RAII wrappers like <code>std::unique_ptr</code> and <code>std::shared_ptr</code>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CMake Build Structure & Dependencies -->
+  <section id="build-cmake" class="section container">
+    <div class="section-header">
+      <h2>CMake Build Subsystem & Target Graph</h2>
+      <p>Target-based CMake design splitting domain business logic into a static core library.</p>
+    </div>
+
+    <div class="code-block">
+      <pre><code># Root CMake Target Structure (CMakeLists.txt snippet)
+cmake_minimum_required(VERSION 3.28)
+project(malama VERSION 0.3.1 LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# 1. Static Domain Core Target
+add_library(malama_core STATIC
+    src/config/config_manager.cpp
+    src/engine/markdown/pipeline.cpp
+    src/engine/storage/attachment_manager.cpp
+    src/engine/storage/history_manager.cpp
+    src/network/ollama_client.cpp
+    src/network/stream_worker.cpp
+)
+
+target_link_libraries(malama_core PUBLIC
+    SQLite3::SQLite3
+    glaze::glaze
+    pugixml
+    PNG::PNG
+    JPEG::JPEG
+    PkgConfig::POPPLER_CPP
+    spdlog::spdlog
+    Boost::cobalt
+    LibArchive::LibArchive
+)
+
+# 2. Native Graphical Application Target
+add_executable(malama src/main.cpp src/ui/main_frame.cpp src/ui/chat_panel.cpp)
+target_link_libraries(malama PRIVATE malama_core wxWidgets::wxWidgets)</code></pre>
+      <button class="copy-code-btn">Copy CMake</button>
+    </div>
+  </section>
+
+  <!-- Testing, CI/CD Pipeline & Automated Integration -->
+  <section id="testing-ci" class="section bg-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Automated Testing & Continuous Integration</h2>
+        <p>Offline unit testing using Catch2 v3 paired with cross-distribution container validation.</p>
+      </div>
+
+      <div class="grid grid-2">
+        <div class="tech-card">
+          <h3>Catch2 Unit Test Suite</h3>
+          <p>Execute offline component tests covering Base64 transcoding, document MIME detection, attachment queue boundaries, and prompt enclosure tag isolation:</p>
+          <div class="code-block margin-top-12">
+            <pre><code># Run tests using CTest
+ctest --test-dir build --output-on-failure
+
+# Execute test target directly
+./build/tests/malama_tests "[unit]"</code></pre>
+            <button class="copy-code-btn">Copy Commands</button>
+          </div>
+        </div>
+
+        <div class="tech-card">
+          <h3>Arch Linux Containerized CI/CD</h3>
+          <p>GitHub Actions uses an <code>archlinux:base-devel</code> container to build, test, and package release binaries under exact compiler environments:</p>
+          <div class="code-block margin-top-12">
+            <pre><code># Local Distro Matrix Execution
+cd tests/integration/distro_matrix
+./run_matrix.sh --distro arch,fedora,ubuntu</code></pre>
+            <button class="copy-code-btn">Copy Script</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-brand">
+        <div class="brand-row">
+          <img src="./screenshots/malama.jpg" alt="Malama Logo" class="footer-logo" />
+          <span class="footer-title">Malama Developer Workspace</span>
+        </div>
+        <p class="footer-tagline">Private by default. Native by design.</p>
+        <p class="footer-copy">&copy; 2026 Wanjare S. (Magpiny). Distributed under the GNU General Public License v3.0.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h5>Documentation</h5>
+          <a href="index.html">User Portal Home</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#class-matrix">Class Reference</a>
+          <a href="#coding-standards">Coding Standards</a>
+        </div>
+        <div class="footer-col">
+          <h5>Developer Resources</h5>
+          <a href="https://github.com/Magpiny/malama" target="_blank">GitHub Repository</a>
+          <a href="https://magpiny.github.io/malama/doxygen/html/" target="_blank">Doxygen API Manual ↗</a>
+          <a href="https://github.com/Magpiny/malama/issues" target="_blank">Issue Tracker</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JS Bundles -->
+  <script src="malama.js"></script>
+  <script src="technical.js"></script>
+</body>
+</html>
