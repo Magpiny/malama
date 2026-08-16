@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Malama — Native C++23 Local LLM Workspace for Linux</title>
+
+  <!-- Favicon / Address Bar Icon -->
+  <link rel="icon" type="image/jpeg" href="../assets/screenshots/malama.jpg" />
+  
+  <!-- Typography: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- CSS Bundle -->
+  <link rel="stylesheet" href="malama.css" />
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="#hero" class="nav-brand">
+        <img src="../assets/screenshots/malama.jpg" alt="Malama Logo" class="brand-logo" />
+        <span class="brand-name">Malama</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#about">About</a>
+        <a href="#showcase">Showcase</a>
+        <a href="#tuning">Engine & Tuning</a>
+        <a href="#ingestion">Ingestion</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/Magpiny/malama" target="_blank" class="github-btn">GitHub</a>
+      </nav>
+      <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Mobile Menu Navigation -->
+  <div class="mobile-menu" id="mobileMenu">
+    <a href="#about" class="mobile-link">About</a>
+    <a href="#showcase" class="mobile-link">Showcase</a>
+    <a href="#tuning" class="mobile-link">Engine & Tuning</a>
+    <a href="#ingestion" class="mobile-link">Ingestion</a>
+    <a href="#install" class="mobile-link">Install</a>
+    <a href="https://github.com/Magpiny/malama" target="_blank" class="mobile-link highlight">GitHub Repository</a>
+  </div>
+
+  <!-- Hero Section -->
+  <section id="hero" class="hero-section">
+    <div class="hero-content">
+      <span class="hero-badge">Native • C++23 • wxWidgets 3.3</span>
+      <h1 class="hero-title">Local AI Intelligence.<br><span class="accent-text">Private by default. Native by design.</span></h1>
+      <p class="hero-subtitle">
+        A high-performance Linux desktop client for Ollama. Direct TCP streaming, zero cloud dependencies, and instant local execution.
+      </p>
+      <div class="hero-actions">
+        <a href="#install" class="btn btn-primary">Get Started</a>
+        <a href="https://github.com/Magpiny/malama/releases" target="_blank" class="btn btn-secondary">Download AppImage</a>
+      </div>
+      <div class="hero-metrics">
+        <div class="metric-card">
+          <span class="metric-val">Native Markdown Rendering Engine</span>
+          <span class="metric-lbl">No Electron Bloat</span>
+
+ <div class="metric-card">
+          <span class="metric-val">0 KB</span>
+          <span class="metric-lbl">Cloud Telemetry</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-val">C++22</span>
+          <span class="metric-lbl">Native Engine</span>
+        </div>
+        </div>
+       
+      </div>
+    </div>
+    <div class="hero-preview">
+      <img src="../assets/screenshots/malama_home.png" alt="Malama Desktop Workspace" class="main-screenshot" />
+    </div>
+  </section>
+
+  <!-- About & Philosophy Section -->
+  <section id="about" class="section container">
+    <div class="section-header">
+      <h2>Architected For Performance</h2>
+      <p>Why waste hundreds of megabytes of system RAM running browser wrappers when your GPU and CPU need that memory for local model inference?</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="feature-card">
+        <div class="card-icon">⚡</div>
+        <h3>Microscopic Footprint</h3>
+        <p>Built with native GTK-backed wxWidgets 3.3 and C++23. Replaces Chromium/Node.js runtimes with a lightweight compiled native binary.</p>
+      </div>
+      <div class="feature-card">
+        <div class="card-icon">🔒</div>
+        <h3>Strict Data Sovereignty</h3>
+        <p>Connects directly to your local Ollama daemon over non-blocking Boost.Asio TCP sockets. No remote proxies, no web wrappers, no tracking.</p>
+      </div>
+      <div class="feature-card">
+        <div class="card-icon">💾</div>
+        <h3>SQLite3 Persistence</h3>
+        <p>Conversations, session titles, pinned items, and hyperparameter states are safely persisted using localized, transactional SQLite queries.</p>
+      </div>
+    </div>
+    <div class="about-image-wrapper">
+      <img src="../assets/screenshots/malama_about.png" alt="About Malama Interface" class="bordered-screenshot" />
+    </div>
+  </section>
+
+  <!-- App Showcase Gallery -->
+  <section id="showcase" class="section bg-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Application Showcase</h2>
+        <p>Explore the clean, functional GTK interface designed strictly for Linux productivity.</p>
+      </div>
+      
+      <div class="showcase-tabs">
+        <button class="tab-btn active" data-tab="tab-home">Home Workspace</button>
+        <button class="tab-btn" data-tab="tab-sessions">Session History</button>
+        <button class="tab-btn" data-tab="tab-settings-ui">UI Appearance</button>
+        <button class="tab-btn" data-tab="tab-settings-engine">Engine Config</button>
+        <button class="tab-btn" data-tab="tab-license">License & Open Source</button>
+      </div>
+
+      <div class="showcase-display">
+        <div class="tab-content active" id="tab-home">
+          <img id="sth_magical" src="../assets/screenshots/malama_homepage.png" alt="Home Workspace" />
+          <div class="tab-caption"><strong>Main Chat Workspace:</strong> Native Markdown rendering, live code block syntax highlighting, and dynamic context attachment staging.</div>
+        </div>
+        <div class="tab-content" id="tab-sessions">
+          <img src="../assets/screenshots/malama_sessions.png" alt="Sessions View" />
+          <div class="tab-caption"><strong>Session Management:</strong> Coordinate-aware hit testing for pinning, renaming, searching, and restoring previous chat sessions instantly.</div>
+        </div>
+        <div class="tab-content" id="tab-settings-ui">
+          <img src="../assets/screenshots/malama_settings_ui.png" alt="UI Settings" />
+          <div class="tab-caption"><strong>Appearance Preferences:</strong> Custom color styling, font sizing, and real-time observer repainting.</div>
+        </div>
+        <div class="tab-content" id="tab-settings-engine">
+            
+          <img src="../assets/screenshots/malama_settings_engine.png" alt="Engine Settings" />
+          <div class="tab-caption"><strong>Ollama Engine Integration:</strong> Dynamic model discovery from local <code>/api/tags</code> endpoints, timeout bounds, and reasoning tag filters.</div>
+        </div>
+        <div class="tab-content" id="tab-license">
+          <img src="../assets/screenshots/malama_licence.png" alt="License View" />
+          <div class="tab-caption"><strong>GNU General Public License v3.0:</strong> Pure open-source software built for developer liberty and privacy.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Session Parameter Tuning & Settings Section -->
+  <section id="tuning" class="section container">
+    <div class="section-header">
+      <h2>Fine-Grained Engine & Session Tuning</h2>
+      <p>Control exact inference behavior per conversation turn or globally across the engine.</p>
+    </div>
+
+    <div class="grid grid-2 alignment-center">
+      <div class="tuning-info">
+        <span class="sub-tag">Per-Session Granularity</span>
+        <h3>Hyperparameter Tuning & System Overrides</h3>
+        <p>Tweak model behavior on a thread-by-thread basis without breaking application state:</p>
+        <ul class="styled-list">
+          <li><strong>Temperature & Top-P:</strong> Adjust output randomness and nucleus sampling parameters in real time.</li>
+          <li><strong>Context Window Allocation (<code>num_ctx</code>):</strong> Dynamically scale context capacity up to 32,000+ tokens to handle long multi-turn discussions and large document payloads.</li>
+          <li><strong>Custom System Prompts:</strong> Inject distinct system personas per session saved directly inside the local SQLite database.</li>
+          <li><strong>Reasoning Block Filtering:</strong> Toggle automatic stripping of DeepSeek/Reasoning model <code>&lt;think&gt;</code> blocks on the fly via a background thread state machine.</li>
+        </ul>
+      </div>
+      <div class="tuning-media">
+        <img src="../assets/screenshots/malama_config_engine.png" alt="Engine Tuning Interface" class="bordered-screenshot" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Asset Ingestion Subsystem Section -->
+  <section id="ingestion" class="section bg-alt">
+    <div class="container">
+      <div class="section-header">
+        <h2>Multimodal Asset Ingestion Engine</h2>
+        <p>Factory-routed parser subsystem capable of reading documents, spreadsheets, eBooks, and vision assets with zero-copy efficiency.</p>
+      </div>
+
+      <div class="table-responsive">
+        <table class="spec-table">
+          <thead>
+            <tr>
+              <th>Asset Category</th>
+              <th>Supported Formats</th>
+              <th>Parsing Engine & Strategy</th>
+              <th>Operational Bounds</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Plain Text</strong></td>
+              <td><code>.txt</code>, <code>.md</code></td>
+              <td>Direct UTF-8 stream ingestion</td>
+              <td>Bounded by available RAM</td>
+            </tr>
+            <tr>
+              <td><strong>PDF Documents</strong></td>
+              <td><code>.pdf</code></td>
+              <td>Page text extraction via <code>poppler-cpp</code></td>
+              <td>4 MB per-file processing limit</td>
+            </tr>
+            <tr>
+              <td><strong>Office Documents</strong></td>
+              <td><code>.docx</code>, <code>.xlsx</code></td>
+              <td>Archive decompression (<code>libarchive</code>) & XML traversal (<code>pugixml</code>)</td>
+              <td>Bounded XML expansion checks</td>
+            </tr>
+            <tr>
+              <td><strong>OpenDocument</strong></td>
+              <td><code>.odt</code>, <code>.ods</code></td>
+              <td>ZIP structure decompression & XML body node isolation</td>
+              <td>Boundary-verified extraction</td>
+            </tr>
+            <tr>
+              <td><strong>E-Books</strong></td>
+              <td><code>.epub</code></td>
+              <td>XHTML manifest extraction and text traversal</td>
+              <td>Sanitizes layout markup</td>
+            </tr>
+            <tr>
+              <td><strong>Images (Vision)</strong></td>
+              <td><code>.png</code>, <code>.png</code>, <code>.jpeg</code>, <code>.webp</code></td>
+              <td>Binary validation via <code>libpng</code>/<code>libjpeg</code> & Base64 encoding</td>
+              <td>4 MB cap; requires vision model</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Installation Pathways & System Dependencies -->
+  <section id="install" class="section container">
+    <div class="section-header">
+      <h2>Installation & Setup Guide</h2>
+      <p>Native installation scripts and package pathways across major Linux distributions.</p>
+    </div>
+
+    <!-- Installation Method Selector -->
+    <div class="install-tabs">
+      <button class="install-btn active" data-install="distro-arch">Arch Linux / CachyOS</button>
+      <button class="install-btn" data-install="distro-fedora">Fedora / RHEL</button>
+      <button class="install-btn" data-install="distro-ubuntu">Ubuntu / Debian</button>
+      <button class="install-btn" data-install="distro-appimage">Universal AppImage</button>
+    </div>
+
+    <div class="install-content-wrapper">
+      <!-- Arch Linux Target -->
+      <div class="install-panel active" id="distro-arch">
+        <div class="install-step">
+          <span class="step-num">1</span>
+          <div class="step-details">
+            <h4>Native Automated Script Deployment (Recommended)</h4>
+            <p>Clone the repository and run the native installer script to auto-detect dependencies, compile optimized binaries, and install launcher menu shortcuts:</p>
+            <div class="code-block">
+              <pre><code>git clone https://github.com/Magpiny/malama.git
+cd malama
+chmod +x install.sh
+./install.sh</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+            <p class="step-note">To completely purge application binaries and desktop launchers, run <code>./uninstall.sh --purge</code>.</p>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <span class="step-num">2</span>
+          <div class="step-details">
+            <h4>Manual Build Dependencies</h4>
+            <div class="code-block">
+              <pre><code>sudo pacman -S --needed git cmake ninja pkgconf gcc \
+  wxwidgets-gtk3 sqlite poppler-cpp libarchive pugixml \
+  libpng libjpeg-turbo spdlog boost boost-libs</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fedora Target -->
+      <div class="install-panel" id="distro-fedora">
+        <div class="install-step">
+          <span class="step-num">1</span>
+          <div class="step-details">
+            <h4>Native Automated Script Deployment</h4>
+            <div class="code-block">
+              <pre><code>git clone https://github.com/Magpiny/malama.git
+cd malama
+chmod +x install.sh
+./install.sh</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <span class="step-num">2</span>
+          <div class="step-details">
+            <h4>Manual Build Dependencies</h4>
+            <div class="code-block">
+              <pre><code>sudo dnf install gcc-c++ cmake ninja-build pkgconfig \
+  wxGTK-devel sqlite-devel poppler-cpp-devel libarchive-devel \
+  pugixml-devel libpng-devel libjpeg-turbo-devel spdlog-devel boost-devel</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Ubuntu Target -->
+      <div class="install-panel" id="distro-ubuntu">
+        <div class="install-step">
+          <span class="step-num">1</span>
+          <div class="step-details">
+            <h4>Native Automated Script Deployment</h4>
+            <div class="code-block">
+              <pre><code>git clone https://github.com/Magpiny/malama.git
+cd malama
+chmod +x install.sh
+./install.sh</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="install-step">
+          <span class="step-num">2</span>
+          <div class="step-details">
+            <h4>Manual Build Dependencies</h4>
+            <div class="code-block">
+              <pre><code>sudo apt-get update && sudo apt-get install -y \
+  build-essential cmake ninja-build pkg-config \
+  libwxgtk3.2-dev sqlite3 libsqlite3-dev \
+  libpoppler-cpp-dev libarchive-dev libpugixml-dev \
+  libpng-dev libjpeg-dev libspdlog-dev libboost-all-dev</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AppImage Target -->
+      <div class="install-panel" id="distro-appimage">
+        <div class="install-step">
+          <span class="step-num">1</span>
+          <div class="step-details">
+            <h4>Download Pre-Compiled AppImage</h4>
+            <p>For all other Linux distributions, download the standalone AppImage built directly from GitHub Releases:</p>
+            <div class="code-block">
+              <pre><code>wget https://github.com/Magpiny/malama/releases/latest/download/Malama-x86_64.AppImage
+chmod +x Malama-x86_64.AppImage
+./Malama-x86_64.AppImage</code></pre>
+              <button class="copy-code-btn">Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core Dependencies Table -->
+    <div class="dep-section">
+      <h3>Required System Libraries & Operational Roles</h3>
+      <div class="table-responsive">
+        <table class="spec-table">
+          <thead>
+            <tr>
+              <th>Library Name</th>
+              <th>Version Requirement</th>
+              <th>Operational Purpose & System Intent</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>wxWidgets</strong></td>
+              <td>≥ 3.3</td>
+              <td>GTK3/4-backed native user interface rendering toolkit</td>
+            </tr>
+            <tr>
+              <td><strong>SQLite3</strong></td>
+              <td>Stable Release</td>
+              <td>Relational conversation history storage & transactional persistence</td>
+            </tr>
+            <tr>
+              <td><strong>Boost.Asio</strong></td>
+              <td>≥ 1.74</td>
+              <td>Non-blocking asynchronous TCP socket loop for streaming Ollama tokens</td>
+            </tr>
+            <tr>
+              <td><strong>poppler-cpp</strong></td>
+              <td>Stable Release</td>
+              <td>PDF document interrogation and UTF-8 text mining parser</td>
+            </tr>
+            <tr>
+              <td><strong>libarchive</strong></td>
+              <td>≥ 3.6</td>
+              <td>Decompression engine for compressed format files (DOCX, ODT, EPUB)</td>
+            </tr>
+            <tr>
+              <td><strong>pugixml</strong></td>
+              <td>≥ 1.12</td>
+              <td>Lightweight XPath XML text node traversal for office documents</td>
+            </tr>
+            <tr>
+              <td><strong>libpng / libjpeg</strong></td>
+              <td>Stable Release</td>
+              <td>Binary validation and structural header verification for images</td>
+            </tr>
+            <tr>
+              <td><strong>Boost.GIL</strong></td>
+              <td>≥ 1.74</td>
+              <td>Graphic processing layout validation for multimodal payloads</td>
+            </tr>
+            <tr>
+              <td><strong>glaze</strong></td>
+              <td>≥ 2.0 / v7.8</td>
+              <td>High-performance compile-time JSON reflection for request payloads</td>
+            </tr>
+            <tr>
+              <td><strong>spdlog</strong></td>
+              <td>≥ 1.12</td>
+              <td>High-speed thread-synchronized application logging</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-brand">
+        <div class="brand-row">
+          <img src="../assets/screenshots/malama.jpg" alt="Malama Logo" class="footer-logo" />
+          <span class="footer-title">Malama</span>
+        </div>
+        <p class="footer-tagline">Private by default. Native by design.</p>
+        <p class="footer-copy">&copy; 2026 Wanjare S. (Magpiny). Distributed under the GNU General Public License v3.0.</p>
+      </div>
+      <div class="footer-links">
+        <div class="footer-col">
+          <h5>Project</h5>
+          <a href="#about">About</a>
+          <a href="#showcase">Screenshots</a>
+          <a href="#ingestion">Ingestion Specs</a>
+          <a href="#install">Install Guide</a>
+        </div>
+        <div class="footer-col">
+          <h5>Community & Source</h5>
+          <a href="https://github.com/Magpiny/malama" target="_blank">GitHub Repository</a>
+          <a href="https://github.com/Magpiny/malama/releases" target="_blank">Releases & AppImages</a>
+          <a href="https://github.com/Magpiny/malama/issues" target="_blank">Issue Tracker</a>
+          <a href="https://github.com/Magpiny/malama/blob/main/LICENSE" target="_blank">GPL-3.0 License</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- JS Bundle -->
+  <script src="malama.js"></script>
+</body>
+</html>

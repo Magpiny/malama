@@ -11,7 +11,7 @@
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-FCC624.svg?logo=linux&logoColor=black)](#build-requirements)
 [![wxWidgets](https://img.shields.io/badge/UI-wxWidgets%203.3-2F6DB2.svg)](https://www.wxwidgets.org/)
 [![Ollama](https://img.shields.io/badge/backend-Ollama-white.svg?logo=ollama&logoColor=black)](https://ollama.com/)
-[![Version](https://img.shields.io/badge/version-0.2.7--7-0A7EA4.svg)](https://github.com/Magpiny/malama/releases)
+[![Version](https://img.shields.io/badge/version-0.3.1-0A7EA4.svg)](https://github.com/Magpiny/malama/releases)
 
 [![CI](https://github.com/Magpiny/malama/actions/workflows/ci_cd.yml/badge.svg)](https://github.com/Magpiny/malama/actions/workflows/ci_cd.yml)
 [![Latest Release](https://img.shields.io/github/v/release/Magpiny/malama?display_name=tag&sort=semver)](https://github.com/Magpiny/malama/releases/latest)
@@ -23,7 +23,7 @@
 ---
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/Magpiny/malama/main/assets/malama_ui.png" alt="Malama v0.2.7-7 user interface" width="100%">
+  <img src="https://raw.githubusercontent.com/Magpiny/malama/main/assets/malama_ui.png" alt="Malama v0.3.1 user interface" width="100%">
 </div>
 
 ---
@@ -32,7 +32,7 @@
 
 - [Overview](#overview)
 - [Why Malama?](#why-malama)
-- [What's New in v0.2.7-7](#whats-new-in-v027-7)
+- [What's New in v0.3.1](#whats-new-in-v0.3.1)
   - [Multimodal Asset Ingestion](#multimodal-asset-ingestion)
   - [Context Isolation Boundaries](#context-isolation-boundaries)
   - [Extended Ollama Context Allocation](#extended-ollama-context-allocation)
@@ -88,9 +88,16 @@ Many desktop AI clients are browser applications packaged as desktop programs. M
 
 ---
 
-## What's New in v0.2.7-7
+## What's New in v0.3.1
 
-### Multimodal Asset Ingestion
+### memory
+    - Switch from single-prompt requests to full conversation replay so the model sees prior turns.
+    - The model can now reference previous conversation in a session and use the history(memory/brain) as context
+       to provide more accurate answers
+### website
+   The App has a new beautiful home 
+
+### Multimodal Asset Ingestion (v0.2.7)
 
 Malama now includes a factory-routed attachment manager capable of processing images, documents, spreadsheets, e-books, and plain-text files.
 
