@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const targetElement = document.querySelector(targetId);
                 if (targetElement) {
                     e.preventDefault();
+                    if (window.location.hash !== targetId) {
+                        history.pushState(null, '', targetId);
+                    }
                     const navbarHeight = 70;
                     const elementPosition = targetElement.getBoundingClientRect().top;
                     const offsetPosition = elementPosition + window.pageYOffset - navbarHeight - 20;
