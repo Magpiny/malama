@@ -6,7 +6,7 @@
   <title>Malama — Native C++23 Local LLM Workspace for Linux</title>
 
   <!-- Favicon / Address Bar Icon -->
-  <link rel="icon" type="image/jpeg" href="../assets/screenshots/malama.jpg" />
+  <link rel="icon" type="image/jpeg" href="./screenshots/malama.jpg" />
   
   <!-- Typography: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +22,7 @@
   <header class="navbar">
     <div class="nav-container">
       <a href="#hero" class="nav-brand">
-        <img src="../assets/screenshots/malama.jpg" alt="Malama Logo" class="brand-logo" />
+        <img src="./screenshots/malama.jpg" alt="Malama Logo" class="brand-logo" />
         <span class="brand-name">Malama</span>
       </a>
       <nav class="nav-links">
@@ -73,7 +73,7 @@
           <span class="metric-lbl">Cloud Telemetry</span>
         </div>
         <div class="metric-card">
-          <span class="metric-val">C++22</span>
+          <span class="metric-val">C++23</span>
           <span class="metric-lbl">Native Engine</span>
         </div>
         </div>
@@ -81,7 +81,7 @@
       </div>
     </div>
     <div class="hero-preview">
-      <img src="../assets/screenshots/malama_home.png" alt="Malama Desktop Workspace" class="main-screenshot" />
+      <img src="./screenshots/malama_home.png" alt="Malama Desktop Workspace" class="main-screenshot" />
     </div>
   </section>
 
@@ -109,7 +109,7 @@
       </div>
     </div>
     <div class="about-image-wrapper">
-      <img src="../assets/screenshots/malama_about.png" alt="About Malama Interface" class="bordered-screenshot" />
+      <img src="./screenshots/malama_about.png" alt="About Malama Interface" class="bordered-screenshot" />
     </div>
   </section>
 
@@ -131,24 +131,24 @@
 
       <div class="showcase-display">
         <div class="tab-content active" id="tab-home">
-          <img id="sth_magical" src="../assets/screenshots/malama_homepage.png" alt="Home Workspace" />
+          <img id="sth_magical" src="./screenshots/malama_homepage.png" alt="Home Workspace" />
           <div class="tab-caption"><strong>Main Chat Workspace:</strong> Native Markdown rendering, live code block syntax highlighting, and dynamic context attachment staging.</div>
         </div>
         <div class="tab-content" id="tab-sessions">
-          <img src="../assets/screenshots/malama_sessions.png" alt="Sessions View" />
+          <img src="./screenshots/malama_sessions.png" alt="Sessions View" />
           <div class="tab-caption"><strong>Session Management:</strong> Coordinate-aware hit testing for pinning, renaming, searching, and restoring previous chat sessions instantly.</div>
         </div>
         <div class="tab-content" id="tab-settings-ui">
-          <img src="../assets/screenshots/malama_settings_ui.png" alt="UI Settings" />
+          <img src="./screenshots/malama_settings_ui.png" alt="UI Settings" />
           <div class="tab-caption"><strong>Appearance Preferences:</strong> Custom color styling, font sizing, and real-time observer repainting.</div>
         </div>
         <div class="tab-content" id="tab-settings-engine">
             
-          <img src="../assets/screenshots/malama_settings_engine.png" alt="Engine Settings" />
+          <img src="./screenshots/malama_settings_engine.png" alt="Engine Settings" />
           <div class="tab-caption"><strong>Ollama Engine Integration:</strong> Dynamic model discovery from local <code>/api/tags</code> endpoints, timeout bounds, and reasoning tag filters.</div>
         </div>
         <div class="tab-content" id="tab-license">
-          <img src="../assets/screenshots/malama_licence.png" alt="License View" />
+          <img src="./screenshots/malama_licence.png" alt="License View" />
           <div class="tab-caption"><strong>GNU General Public License v3.0:</strong> Pure open-source software built for developer liberty and privacy.</div>
         </div>
       </div>
@@ -175,7 +175,7 @@
         </ul>
       </div>
       <div class="tuning-media">
-        <img src="../assets/screenshots/malama_config_engine.png" alt="Engine Tuning Interface" class="bordered-screenshot" />
+        <img src="./screenshots/malama_config_engine.png" alt="Engine Tuning Interface" class="bordered-screenshot" />
       </div>
     </div>
   </section>
@@ -241,11 +241,53 @@
     </div>
   </section>
 
-  <!-- Installation Pathways & System Dependencies -->
+    <!-- Installation Pathways & System Dependencies -->
   <section id="install" class="section container">
     <div class="section-header">
       <h2>Installation & Setup Guide</h2>
       <p>Native installation scripts and package pathways across major Linux distributions.</p>
+    </div>
+
+    <!-- System Prerequisites: Ollama & Model Provisioning -->
+    <div class="prereq-banner">
+      <div class="prereq-header">
+        <span class="prereq-badge">Step 1 — System Prerequisite</span>
+        <h3>Ollama Daemon & Target Model Provisioning</h3>
+        <p>Malama operates as a native local workspace client. Ensure the local <code>ollama</code> service daemon is installed, running, and populated with at least one local model prior to launching Malama.</p>
+      </div>
+
+      <div class="prereq-grid">
+        <div class="prereq-card">
+          <h4>2. Verify / Start Ollama Daemon</h4>
+          <p>Confirm the Ollama background service listener is active</p>
+          <div class="code-block">
+            <pre><code>systemctl status ollama || ollama serve</code></pre>
+            <button class="copy-code-btn">Copy</button>
+          </div>
+        </div>
+
+        <div class="prereq-card">
+          <h4>3. Pull Recommended Models</h4>
+          <p>Provision standard text/coding agents or multimodal vision models</p>
+          <div class="code-block">
+            <pre><code># Standard Text & Coding Agent
+ollama pull ornith
+
+# Multimodal Vision Model
+ollama pull gemma4:e4b</code></pre>
+            <button class="copy-code-btn">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vision Capability Warning Notice -->
+      <div class="warning-callout">
+        <div class="callout-icon">⚠️</div>
+        <div class="callout-content">
+          <strong>Multimodal Vision Requirement Notice:</strong>
+          <p>Image attachments (<code>.png</code>, <code>.jpg</code>, <code>.webp</code>) require an active model explicitly equipped with vision architecture capabilities (e.g., <code>gemma4:e4b</code> or <code>qwen2-vl</code>). Text-only agents (such as <code>ornith</code>) will ignore or reject binary image payloads.</p>
+        </div>
+      </div>
     </div>
 
     <!-- Installation Method Selector -->
@@ -359,9 +401,9 @@ chmod +x install.sh
             <h4>Download Pre-Compiled AppImage</h4>
             <p>For all other Linux distributions, download the standalone AppImage built directly from GitHub Releases:</p>
             <div class="code-block">
-              <pre><code>wget https://github.com/Magpiny/malama/releases/latest/download/Malama-x86_64.AppImage
-chmod +x Malama-x86_64.AppImage
-./Malama-x86_64.AppImage</code></pre>
+              <pre><code>wget https://github.com/Magpiny/malama/releases/download/v0.3.1/Malama-v0.3.0-x86_64.AppImage
+chmod +x Malama-v0.3.0-x86_64.AppImage
+./Malama-v0.3.0-x86_64.AppImage</code></pre>
               <button class="copy-code-btn">Copy</button>
             </div>
           </div>
@@ -443,7 +485,7 @@ chmod +x Malama-x86_64.AppImage
     <div class="container footer-content">
       <div class="footer-brand">
         <div class="brand-row">
-          <img src="../assets/screenshots/malama.jpg" alt="Malama Logo" class="footer-logo" />
+          <img src="./screenshots/malama.jpg" alt="Malama Logo" class="footer-logo" />
           <span class="footer-title">Malama</span>
         </div>
         <p class="footer-tagline">Private by default. Native by design.</p>
