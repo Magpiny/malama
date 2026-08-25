@@ -20,7 +20,13 @@ squashfs-root
 ./squashfs-root
 Malama-v0.3.0-x86_64.AppImage
 Malama-v0.3.0-x86_64.AppImage.zsync
-./PKGBUILD/malama/*
-malama-0.3.0.tar.gz
-
+PKGBUILD/malama/
+PKGBUILD/malama
+PKGBUILD/src/
+PKGBUILD/pkg/
+PKGBUILD/*.tar.*
+*.pkg.tar.*
+*.tar.gz
+*.deb
+*.rpm
 
