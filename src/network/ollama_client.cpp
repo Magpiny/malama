@@ -15,7 +15,7 @@
 #include <boost/asio/this_coro.hpp>
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
-#include <boost/cobalt/generator.hpp>
+#include <boost/container_hash/hash.hpp>
 #include <format>
 #include <glaze/glaze.hpp>
 #include <spdlog/spdlog.h>
@@ -174,8 +174,17 @@ auto OllamaClient::ExecuteStreamTask(std::string model_name,
     m_cancellation_requested.store(false);
     m_residual_line_accumulator.clear();
 
-    const std::string cache_key =
-        std::format("{}:{}:{}", model_name, prompt_text, params.m_system_prompt);
+    // Hash full conversation history state to ensure context-aware caching
+    std::size_t history_hash = 0UZ;
+    for (const auto &msg : history) {
+        boost::hash_combine(history_hash, msg.m_content);
+        boost::hash_combine(history_hash, static_cast<int>(msg.m_role));
+    }
+
+    const std::string cache_key = std::format(
+        "{}:{}:{:.2f}:{:.2f}:{}:{:.2f}:{}:{}:{}:{}", model_name, prompt_text,
+        params.m_temperature, params.m_top_p, params.m_top_k, params.m_repeat_penalty,
+        params.m_num_ctx, params.m_system_prompt, history_hash, images_payload.size());
     if (auto cached_response = CheckCache(cache_key); cached_response.has_value()) {
         if (token_callback) {
             token_callback(cached_response.value());

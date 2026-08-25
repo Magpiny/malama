@@ -8,10 +8,13 @@
 // /////////////////////////////////////////////////////////////////////////////
 
 #include <catch2/catch_session.hpp>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 int main(int argc, char *argv[]) {
-    // Inject the human-friendly colored logging layout globally
+    // Route spdlog to stderr to keep Catch2 test discovery stdout clean
+    auto stderr_logger = spdlog::stderr_color_mt("test_runner");
+    spdlog::set_default_logger(stderr_logger);
     spdlog::set_pattern("^[%T] [ℹ️ INFO] [%s:%#]%$ => %v");
     spdlog::info("Initializing malama_tests offline execution suite.");
 

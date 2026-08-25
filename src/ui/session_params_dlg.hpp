@@ -63,9 +63,9 @@ class SessionParamsDialog final : public wxDialog {
     wxSlider *m_num_ctx_slider{nullptr};
     wxStaticText *m_num_ctx_value_label{nullptr};
 
-    wxTextCtrl *m_top_p_ctrl{nullptr};
+    wxSpinCtrlDouble *m_top_p_ctrl{nullptr};
     wxSpinCtrl *m_top_k_ctrl{nullptr};
-    wxTextCtrl *m_repeat_penalty_ctrl{nullptr};
+    wxSpinCtrlDouble *m_repeat_penalty_ctrl{nullptr};
 
     wxTextCtrl *m_system_prompt_ctrl{nullptr};
 };

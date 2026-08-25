@@ -9,13 +9,16 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
+#include <filesystem>
 #include <string>
 #include <vector>
 
 #include "core/models.hpp"
 #include "engine/storage/attachment_manager.hpp"
+#include "engine/storage/history_manager.hpp"
 #include "engine/token/token_estimator.hpp"
 
 namespace malama::tests {
@@ -61,6 +64,46 @@ TEST_CASE("TokenEstimator calculates text and payload tokens accurately", "[unit
         REQUIRE(is_overflow == false);
         REQUIRE(usage_percentage < 10.0F);
     }
+}
+
+TEST_CASE("HistoryManager handles custom SessionParameters properly", "[unit][storage][params]") {
+    std::filesystem::path test_dir =
+        std::filesystem::temp_directory_path() / "malama_params_test";
+    std::filesystem::remove_all(test_dir);
+
+    engine::storage::HistoryManager manager(test_dir);
+
+    core::ModelParameters custom_params{
+        .m_temperature = 1.35F,
+        .m_top_p = 0.85F,
+        .m_top_k = 75,
+        .m_repeat_penalty = 1.25F,
+        .m_num_ctx = 32768,
+        .m_system_prompt = "You are an expert C++ assistant."
+    };
+
+    auto meta = manager.CreateSession("Params Test Session", custom_params);
+    auto loaded = manager.LoadSession(meta.m_session_id);
+
+    REQUIRE(loaded.has_value());
+    REQUIRE(loaded->m_metadata.m_parameters.m_temperature == Catch::Approx(1.35F));
+    REQUIRE(loaded->m_metadata.m_parameters.m_top_p == Catch::Approx(0.85F));
+    REQUIRE(loaded->m_metadata.m_parameters.m_top_k == 75);
+    REQUIRE(loaded->m_metadata.m_parameters.m_repeat_penalty == Catch::Approx(1.25F));
+    REQUIRE(loaded->m_metadata.m_parameters.m_num_ctx == 32768);
+    REQUIRE(loaded->m_metadata.m_parameters.m_system_prompt == "You are an expert C++ assistant.");
+
+    // Test parameter mutation update
+    custom_params.m_temperature = 0.2F;
+    custom_params.m_num_ctx = 65536;
+    manager.UpdateSessionParameters(meta.m_session_id, custom_params);
+
+    auto updated = manager.LoadSession(meta.m_session_id);
+    REQUIRE(updated.has_value());
+    REQUIRE(updated->m_metadata.m_parameters.m_temperature == Catch::Approx(0.2F));
+    REQUIRE(updated->m_metadata.m_parameters.m_num_ctx == 65536);
+
+    std::filesystem::remove_all(test_dir);
 }
 
 }  // namespace malama::tests
