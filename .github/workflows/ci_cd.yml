@@ -1,4 +1,5 @@
-name: Malama Continuous Integration & Deployment (Arch Linux)
+name: Malama Continuous Integration & Deployment
+
 on:
   push:
     branches:
@@ -9,11 +10,16 @@ on:
   pull_request:
     branches:
       - main
+
 permissions:
   contents: read
+
 jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Test Layer: Build & Execute Unit, Integration, and Stress Test Suites
+  # ---------------------------------------------------------------------------
   build-test:
-    name: Build & Test (Arch Linux baseline)
+    name: Build & Test (Unit, Integration, Stress)
     runs-on: ubuntu-latest
     container:
       image: archlinux:base-devel
@@ -35,18 +41,21 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DBUILD_TESTING=ON
-      - name: Build Targets
+      - name: Build All Targets
         run: cmake --build build --parallel $(nproc)
-      - name: Execute Offline Test Suite
-        run: |
-          ctest --test-dir build --output-on-failure
+      - name: Run Test Suite (Catch2 via CTest)
+        run: ctest --test-dir build --output-on-failure
+      - name: Run Distro Matrix Static Verification
+        run: bash tests/integration/distro_matrix/test_run_matrix.sh
+
+  # ---------------------------------------------------------------------------
+  # 2. Packaging: AppImage Bundle
+  # ---------------------------------------------------------------------------
   package-appimage:
-    name: AppImage Assembly & Release Deployment
+    name: Package AppImage
     needs: build-test
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     container:
       image: archlinux:base-devel
     steps:
@@ -60,38 +69,199 @@ jobs:
             spdlog boost boost-libs wget file appstream
       - name: Checkout Code
         uses: actions/checkout@v4
-      - name: Build Release Binary
-        run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build --target malama --parallel $(nproc)
       - name: Build AppImage Bundle
         run: |
           chmod +x scripts/build_appimage.sh
           ./scripts/build_appimage.sh
-      - name: Verify AppImage Artifact Naming
+      - name: Verify AppImage Artifacts
         run: |
-          echo "🔍 Checking for expected AppImage artifact..."
-          VERSION=$(grep -oP 'project\(malama VERSION \K[0-9.]+' CMakeLists.txt || echo "0.0.0")
-          EXPECTED="Malama-v${VERSION}-x86_64.AppImage"
-          if [ ! -f "${EXPECTED}" ]; then
-            echo "❌ [ERROR] => Expected artifact '${EXPECTED}' not found."
-            echo "❌ Files present in workspace:"
-            ls -la *.AppImage* 2>/dev/null || echo "  (none found)"
-            exit 1
-          fi
-          MATCH_COUNT=$(ls Malama-v*-x86_64.AppImage 2>/dev/null | wc -l)
-          if [ "${MATCH_COUNT}" -ne 1 ]; then
-            echo "❌ [ERROR] => Expected exactly 1 matching AppImage, found ${MATCH_COUNT}."
-            ls -la Malama-v*-x86_64.AppImage
-            exit 1
-          fi
-          echo "✅ Found exactly one correctly-named artifact: ${EXPECTED}"
-      - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v1
+          ls -la Malama-v*-x86_64.AppImage*
+      - name: Upload AppImage Artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: appimage-bundle
+          path: |
             Malama-v*-x86_64.AppImage
             Malama-v*-x86_64.AppImage.zsync
+
+  # ---------------------------------------------------------------------------
+  # 3. Packaging: Arch Linux Package (.pkg.tar.zst & .pkg.tar.gz)
+  # ---------------------------------------------------------------------------
+  package-arch:
+    name: Package Arch Linux (pkg.tar.zst / pkg.tar.gz)
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Install Build Dependencies
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            git cmake ninja pkgconf gcc \
+            wxwidgets-gtk3 sqlite poppler \
+            libarchive pugixml libpng libjpeg-turbo \
+            spdlog boost boost-libs tar zstd gzip
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build & Assemble Arch Package
+        run: |
+          VERSION=$(grep -oP 'project\(malama VERSION \K[0-9.]+' CMakeLists.txt || echo "0.3.0")
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --target malama --parallel $(nproc)
+
+          DESTDIR="/tmp/malama_arch_pkg"
+          rm -rf "${DESTDIR}"
+          mkdir -p "${DESTDIR}/usr"
+          cmake --install build --prefix "${DESTDIR}/usr"
+
+          cat <<EOF > "${DESTDIR}/.PKGINFO"
+          pkgname = malama
+          pkgver = ${VERSION}-1
+          pkgdesc = Native Linux chat client for local LLMs — no cloud, no browser, no compromise.
+          url = https://magpiny.dev
+          builddate = $(date +%s)
+          packager = Wanjare <samuelwanjare@protonmail.com>
+          size = $(du -sb "${DESTDIR}" | awk '{print $1}')
+          arch = x86_64
+          license = GPL3
+          depend = wxwidgets-gtk3
+          depend = sqlite
+          depend = poppler
+          depend = libarchive
+          depend = pugixml
+          depend = libpng
+          depend = libjpeg-turbo
+          depend = spdlog
+          depend = boost-libs
+          EOF
+
+          mkdir -p dist
+          (cd "${DESTDIR}" && tar -czf "${GITHUB_WORKSPACE}/dist/malama-${VERSION}-x86_64.pkg.tar.gz" .PKGINFO usr)
+          (cd "${DESTDIR}" && tar --zstd -cf "${GITHUB_WORKSPACE}/dist/malama-${VERSION}-x86_64.pkg.tar.zst" .PKGINFO usr)
+      - name: Upload Arch Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-packages
+          path: dist/malama-*.pkg.tar.*
+
+  # ---------------------------------------------------------------------------
+  # 4. Packaging: Debian / Ubuntu Package (.deb)
+  # ---------------------------------------------------------------------------
+  package-deb:
+    name: Package Debian / Ubuntu (.deb)
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:noble
+    steps:
+      - name: Install Build Dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          apt-get update && apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build git pkg-config \
+            libwxgtk3.2-dev libsqlite3-dev libpoppler-cpp-dev \
+            libarchive-dev libpugixml-dev libpng-dev libjpeg-dev \
+            libspdlog-dev libboost-all-dev dpkg-dev file ca-certificates
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build & Package DEB
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --target malama --parallel $(nproc)
+          cpack --config build/CPackConfig.cmake -G DEB -B dist_deb
+      - name: Upload DEB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: dist_deb/*.deb
+
+  # ---------------------------------------------------------------------------
+  # 5. Packaging: Fedora / RHEL Package (.rpm)
+  # ---------------------------------------------------------------------------
+  package-rpm:
+    name: Package Fedora (.rpm)
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:40
+    steps:
+      - name: Install Build Dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            gcc-c++ cmake ninja-build git pkgconfig \
+            wxGTK-devel sqlite-devel poppler-cpp-devel \
+            libarchive-devel pugixml-devel libpng-devel libjpeg-turbo-devel \
+            spdlog-devel boost-devel rpm-build file
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Build & Package RPM
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --target malama --parallel $(nproc)
+          cpack --config build/CPackConfig.cmake -G RPM -B dist_rpm
+      - name: Upload RPM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: dist_rpm/*.rpm
+
+  # ---------------------------------------------------------------------------
+  # 6. Release: Publish All Artifacts to GitHub Releases
+  # ---------------------------------------------------------------------------
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      - build-test
+      - package-appimage
+      - package-arch
+      - package-deb
+      - package-rpm
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+      - name: Download AppImage Bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: appimage-bundle
+          path: release_assets
+      - name: Download Arch Packages
+        uses: actions/download-artifact@v4
+        with:
+          name: arch-packages
+          path: release_assets
+      - name: Download DEB Package
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+          path: release_assets
+      - name: Download RPM Package
+        uses: actions/download-artifact@v4
+        with:
+          name: rpm-package
+          path: release_assets
+      - name: List Release Assets
+        run: |
+          echo "📦 Assets prepared for GitHub Release:"
+          ls -lh release_assets/
+      - name: Publish Release to GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_assets/Malama-v*-x86_64.AppImage
+            release_assets/Malama-v*-x86_64.AppImage.zsync
+            release_assets/malama-*.pkg.tar.gz
+            release_assets/malama-*.pkg.tar.zst
+            release_assets/*.deb
+            release_assets/*.rpm
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

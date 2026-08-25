@@ -164,6 +164,10 @@ void ChatPanel::setup_layout() noexcept {
     return m_active_session;
 }
 
+void ChatPanel::set_session_id(std::string_view session_id) noexcept {
+    m_active_session.m_metadata.m_session_id = std::string(session_id);
+}
+
 void ChatPanel::set_session_parameters(const common::SessionParameters &params) noexcept {
     m_active_session.m_metadata.m_parameters =
         core::ModelParameters{.m_temperature = params.m_temperature,

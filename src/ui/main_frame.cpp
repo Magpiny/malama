@@ -399,9 +399,7 @@ void MainFrame::on_preferences_action(wxCommandEvent &WXUNUSED(event)) noexcept 
 void MainFrame::on_session_params_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     if (m_chat_panel_ptr != nullptr) {
         const auto &active_session = m_chat_panel_ptr->get_active_session();
-        if (!active_session.m_metadata.m_session_id.empty()) {
-            m_current_session_params = to_common_params(active_session.m_metadata.m_parameters);
-        }
+        m_current_session_params = to_common_params(active_session.m_metadata.m_parameters);
     }
 
     SessionParamsDialog dialog(this, m_current_session_params);
@@ -551,12 +549,14 @@ void MainFrame::on_user_prompt_submitted(wxCommandEvent &event) noexcept {
                                         ? prompt_text.substr(0, MAX_SESSION_TITLE_LENGTH) + "..."
                                         : prompt_text;
 
-        auto new_session = m_history_manager_ptr->CreateSession(default_title);
+        auto new_session = m_history_manager_ptr->CreateSession(
+            default_title, to_core_params(m_current_session_params));
         m_current_session_id = new_session.m_session_id;
 
-        // Persist tuned parameters to newly created session
-        m_history_manager_ptr->UpdateSessionParameters(m_current_session_id,
-                                                       to_core_params(m_current_session_params));
+        if (m_chat_panel_ptr != nullptr) {
+            m_chat_panel_ptr->set_session_id(m_current_session_id);
+            m_chat_panel_ptr->set_session_parameters(m_current_session_params);
+        }
 
         if (m_sidebar_panel_ptr != nullptr) {
             m_sidebar_panel_ptr->populate_sidebar();

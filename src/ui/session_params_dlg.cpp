@@ -65,19 +65,22 @@ void SessionParamsDialog::InitializeComponents() noexcept {
     // --- Context Capacity (num_ctx) Slider ---
     grid_sizer->Add(new wxStaticText(this, wxID_ANY, "Context Size (num_ctx):"), 0,
                     wxALIGN_CENTER_VERTICAL);
-    m_num_ctx_slider = new wxSlider(this, wxID_ANY, static_cast<int>(m_params.m_num_ctx),
+    const uint32_t clamped_ctx = std::clamp(m_params.m_num_ctx, kMinCtx, kMaxCtx);
+    m_num_ctx_slider = new wxSlider(this, wxID_ANY, static_cast<int>(clamped_ctx),
                                     static_cast<int>(kMinCtx), static_cast<int>(kMaxCtx),
                                     wxDefaultPosition, wxDefaultSize, wxSL_HORIZONTAL);
     grid_sizer->Add(m_num_ctx_slider, 1, wxEXPAND | wxALIGN_CENTER_VERTICAL);
     m_num_ctx_value_label =
-        new wxStaticText(this, wxID_ANY, std::format("{} tokens", m_params.m_num_ctx),
+        new wxStaticText(this, wxID_ANY, std::format("{} tokens", clamped_ctx),
                          wxDefaultPosition, wxSize(80, -1));
     grid_sizer->Add(m_num_ctx_value_label, 0, wxALIGN_CENTER_VERTICAL);
 
     // --- Top-P Control ---
     grid_sizer->Add(new wxStaticText(this, wxID_ANY, "Top P (0.0 - 1.0):"), 0,
                     wxALIGN_CENTER_VERTICAL);
-    m_top_p_ctrl = new wxTextCtrl(this, wxID_ANY, std::format("{:.2f}", m_params.m_top_p));
+    m_top_p_ctrl = new wxSpinCtrlDouble(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+                                        wxSP_ARROW_KEYS, 0.0, 1.0, m_params.m_top_p, 0.05);
+    m_top_p_ctrl->SetDigits(2);
     grid_sizer->Add(m_top_p_ctrl, 0, wxEXPAND);
     grid_sizer->AddStretchSpacer();
 
@@ -92,7 +95,9 @@ void SessionParamsDialog::InitializeComponents() noexcept {
     grid_sizer->Add(new wxStaticText(this, wxID_ANY, "Repeat Penalty:"), 0,
                     wxALIGN_CENTER_VERTICAL);
     m_repeat_penalty_ctrl =
-        new wxTextCtrl(this, wxID_ANY, std::format("{:.2f}", m_params.m_repeat_penalty));
+        new wxSpinCtrlDouble(this, wxID_ANY, "", wxDefaultPosition, wxDefaultSize,
+                             wxSP_ARROW_KEYS, 0.0, 2.0, m_params.m_repeat_penalty, 0.05);
+    m_repeat_penalty_ctrl->SetDigits(2);
     grid_sizer->Add(m_repeat_penalty_ctrl, 0, wxEXPAND);
     grid_sizer->AddStretchSpacer();
 
@@ -151,12 +156,13 @@ void SessionParamsDialog::OnResetDefaults(wxCommandEvent & /*event*/) noexcept {
         static_cast<int>(defaults.m_temperature * static_cast<float>(kSliderTempScale)));
     m_temp_value_label->SetLabel(std::format("{:.2f}", defaults.m_temperature));
 
-    m_num_ctx_slider->SetValue(static_cast<int>(defaults.m_num_ctx));
-    m_num_ctx_value_label->SetLabel(std::format("{} tokens", defaults.m_num_ctx));
+    const uint32_t clamped_ctx = std::clamp(defaults.m_num_ctx, kMinCtx, kMaxCtx);
+    m_num_ctx_slider->SetValue(static_cast<int>(clamped_ctx));
+    m_num_ctx_value_label->SetLabel(std::format("{} tokens", clamped_ctx));
 
-    m_top_p_ctrl->SetValue(std::format("{:.2f}", defaults.m_top_p));
+    m_top_p_ctrl->SetValue(defaults.m_top_p);
     m_top_k_ctrl->SetValue(defaults.m_top_k);
-    m_repeat_penalty_ctrl->SetValue(std::format("{:.2f}", defaults.m_repeat_penalty));
+    m_repeat_penalty_ctrl->SetValue(defaults.m_repeat_penalty);
     m_system_prompt_ctrl->SetValue(defaults.m_system_prompt);
 }
 
@@ -165,21 +171,9 @@ void SessionParamsDialog::OnResetDefaults(wxCommandEvent & /*event*/) noexcept {
     result.m_temperature =
         static_cast<float>(m_temp_slider->GetValue()) / static_cast<float>(kSliderTempScale);
     result.m_num_ctx = static_cast<uint32_t>(m_num_ctx_slider->GetValue());
-
-    try {
-        result.m_top_p = std::stof(m_top_p_ctrl->GetValue().ToStdString());
-    } catch (...) {
-        result.m_top_p = constants::top_p;
-    }
-
+    result.m_top_p = static_cast<float>(m_top_p_ctrl->GetValue());
     result.m_top_k = m_top_k_ctrl->GetValue();
-
-    try {
-        result.m_repeat_penalty = std::stof(m_repeat_penalty_ctrl->GetValue().ToStdString());
-    } catch (...) {
-        result.m_repeat_penalty = constants::rpt_penalty;
-    }
-
+    result.m_repeat_penalty = static_cast<float>(m_repeat_penalty_ctrl->GetValue());
     result.m_system_prompt = m_system_prompt_ctrl->GetValue().ToStdString();
     return result;
 }

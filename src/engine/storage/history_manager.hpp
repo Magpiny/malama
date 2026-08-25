@@ -36,7 +36,9 @@ class HistoryManager final {
     auto operator=(HistoryManager &&) noexcept -> HistoryManager & = delete;
 
     // Lifecycle Management
-    [[nodiscard]] auto CreateSession(const std::string &initial_title) -> core::SessionMetadata;
+    [[nodiscard]] auto CreateSession(const std::string &initial_title,
+                                     const core::ModelParameters &params = {})
+        -> core::SessionMetadata;
     auto DeleteSession(const std::string &session_id) -> void;
 
     // Transactional Serialized Database Mutations

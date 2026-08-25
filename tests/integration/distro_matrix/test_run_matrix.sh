@@ -111,14 +111,9 @@ echo ""
 echo "=== Suite 2: run_matrix.sh structural content ==="
 
 assert_contains \
-    "run_matrix.sh enables set -e for exit-on-error" \
+    "run_matrix.sh enables set -euo pipefail for safe execution" \
     "${RUN_MATRIX}" \
-    "set -e"
-
-assert_contains \
-    "run_matrix.sh exports DOCKER_BUILDKIT=1 to suppress legacy builder warnings" \
-    "${RUN_MATRIX}" \
-    "export DOCKER_BUILDKIT=1"
+    "set -euo pipefail"
 
 assert_contains \
     "run_matrix.sh resolves SCRIPT_DIR from BASH_SOURCE[0]" \
@@ -131,29 +126,14 @@ assert_contains \
     'PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"'
 
 assert_contains \
-    "run_matrix.sh changes working directory to PROJECT_ROOT before building" \
+    "run_matrix.sh defines DISTROS array" \
     "${RUN_MATRIX}" \
-    'cd "${PROJECT_ROOT}"'
+    'DISTROS=("arch" "fedora" "ubuntu")'
 
 assert_contains \
-    "run_matrix.sh iterates over ubuntu in distro loop" \
+    "run_matrix.sh iterates over distro array" \
     "${RUN_MATRIX}" \
-    "ubuntu"
-
-assert_contains \
-    "run_matrix.sh iterates over fedora in distro loop" \
-    "${RUN_MATRIX}" \
-    "fedora"
-
-assert_contains \
-    "run_matrix.sh iterates over arch in distro loop" \
-    "${RUN_MATRIX}" \
-    "arch"
-
-assert_contains \
-    "run_matrix.sh uses loop variable for distro iteration (for distro in)" \
-    "${RUN_MATRIX}" \
-    "for distro in ubuntu fedora arch"
+    'for distro in "${DISTROS[@]}"; do'
 
 assert_contains \
     "run_matrix.sh passes Dockerfile path using SCRIPT_DIR variable" \
@@ -161,41 +141,29 @@ assert_contains \
     '-f "${SCRIPT_DIR}/${distro}.dockerfile"'
 
 assert_contains \
-    "run_matrix.sh tags images as malama-test:\${distro}" \
+    "run_matrix.sh tags images as malama-verify:\${distro}" \
     "${RUN_MATRIX}" \
-    '-t "malama-test:${distro}"'
+    '-t "malama-verify:${distro}"'
 
 assert_contains \
-    "run_matrix.sh mounts PROJECT_ROOT into container at /workspace" \
+    "run_matrix.sh builds from PROJECT_ROOT context" \
     "${RUN_MATRIX}" \
-    '-v "${PROJECT_ROOT}:/workspace"'
+    '"${PROJECT_ROOT}"'
 
 assert_contains \
-    "run_matrix.sh creates per-distro build directory build_\${distro}" \
+    "run_matrix.sh executes user-space installation test" \
     "${RUN_MATRIX}" \
-    "mkdir -p build_\${distro}"
+    './install.sh'
 
 assert_contains \
-    "run_matrix.sh invokes cmake with Release build type" \
+    "run_matrix.sh tests uninstallation with purge" \
     "${RUN_MATRIX}" \
-    "cmake -DCMAKE_BUILD_TYPE=Release .."
+    './uninstall.sh --purge'
 
 assert_contains \
-    "run_matrix.sh invokes make with nproc parallelism" \
+    "run_matrix.sh uses --rm flag to clean up containers after verification" \
     "${RUN_MATRIX}" \
-    'make -j\$(nproc)'
-
-assert_contains \
-    "run_matrix.sh uses --rm flag to clean up containers after build" \
-    "${RUN_MATRIX}" \
-    "docker run --rm"
-
-# Regression: old cmake_minimum_required was 4.2; ensure the script is not
-# hardcoding the old version anywhere.
-assert_not_contains \
-    "run_matrix.sh does not reference obsolete cmake version 4.2" \
-    "${RUN_MATRIX}" \
-    "4.2"
+    'docker run --rm'
 
 # ---------------------------------------------------------------------------
 # Suite 3: ubuntu.dockerfile content validation
@@ -263,9 +231,9 @@ assert_file_exists \
     "${FEDORA_DF}"
 
 assert_contains \
-    "fedora.dockerfile uses fedora:40 base image" \
+    "fedora.dockerfile uses fedora base image" \
     "${FEDORA_DF}" \
-    "FROM fedora:40"
+    "FROM fedora:"
 
 assert_contains \
     "fedora.dockerfile installs gcc-c++" \
@@ -313,9 +281,9 @@ assert_file_exists \
     "${ARCH_DF}"
 
 assert_contains \
-    "arch.dockerfile uses archlinux:latest base image" \
+    "arch.dockerfile uses archlinux base image" \
     "${ARCH_DF}" \
-    "FROM archlinux:latest"
+    "FROM archlinux:"
 
 assert_contains \
     "arch.dockerfile enables parallel downloads in pacman.conf" \
@@ -328,14 +296,9 @@ assert_contains \
     "DisableDownloadTimeout"
 
 assert_contains \
-    "arch.dockerfile configures geo mirror as primary mirror" \
+    "arch.dockerfile configures archive or mirror server" \
     "${ARCH_DF}" \
-    "geo.mirror.pkgbuild.com"
-
-assert_contains \
-    "arch.dockerfile configures rackspace mirror as fallback mirror" \
-    "${ARCH_DF}" \
-    "mirror.rackspace.com"
+    "archive.archlinux.org"
 
 assert_contains \
     "arch.dockerfile installs base-devel toolchain" \

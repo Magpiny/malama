@@ -47,6 +47,7 @@ class ChatPanel final : public wxPanel {
     void append_token(std::string_view token_segment) noexcept;
     void append_user_message(std::string_view message) noexcept;
     void load_history(const core::ChatSession &session) noexcept;
+    void set_session_id(std::string_view session_id) noexcept;
     /// @brief Dynamically applies parameter configuration changes (e.g., system prompt,
     /// temperature, num_ctx)
     void set_session_parameters(const common::SessionParameters &params) noexcept;

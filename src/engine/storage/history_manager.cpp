@@ -99,7 +99,8 @@ auto HistoryManager::InitializeDatabase() noexcept -> bool {
     return true;
 }
 
-auto HistoryManager::CreateSession(const std::string &initial_title) -> core::SessionMetadata {
+auto HistoryManager::CreateSession(const std::string &initial_title,
+                                   const core::ModelParameters &params) -> core::SessionMetadata {
     std::lock_guard<std::mutex> lock(m_mutex);
 
     core::SessionMetadata metadata;
@@ -108,6 +109,7 @@ auto HistoryManager::CreateSession(const std::string &initial_title) -> core::Se
     metadata.m_created_at = GetCurrentEpoch();
     metadata.m_updated_at = metadata.m_created_at;
     metadata.m_is_pinned = false;
+    metadata.m_parameters = params;
 
     if (m_db_handle == nullptr) {
         return metadata;
