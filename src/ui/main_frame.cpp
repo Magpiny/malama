@@ -429,12 +429,12 @@ void MainFrame::on_exit_action(wxCommandEvent &WXUNUSED(event)) noexcept {
 void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     wxAboutDialogInfo info;
     info.SetName(_("Malama"));
-    info.SetVersion(_("0.3.1"));
+    info.SetVersion(_("0.3.3"));
     info.SetDescription(
         wxT("Native Linux chat client for local LLMs — no cloud, no browser, no compromise."));
     info.SetCopyright(wxT("Copyright (C) 2026"));
-    info.SetWebSite(wxT("https://magpiny.dev"));
-    info.AddDeveloper(wxT("Wanjare Samuel"));
+    info.SetWebSite(wxT("https://magpiny.github.io/malama"));
+    info.AddDeveloper(wxT("Magpiny"));
 
     wxIcon logo_icon;
     if (wxFileExists(wxT("assets/malama.png"))) {

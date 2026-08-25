@@ -33,7 +33,7 @@ jobs:
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs appstream
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Configure CMake
@@ -68,7 +68,7 @@ jobs:
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs wget file appstream
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build AppImage Bundle
         run: |
           chmod +x scripts/build_appimage.sh
@@ -77,7 +77,7 @@ jobs:
         run: |
           ls -la Malama-v*-x86_64.AppImage*
       - name: Upload AppImage Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: appimage-bundle
           path: |
@@ -104,7 +104,7 @@ jobs:
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs tar zstd gzip
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build & Assemble Arch Package
         run: |
           VERSION=$(grep -oP 'project\(malama VERSION \K[0-9.]+' CMakeLists.txt || echo "0.3.0")
@@ -141,7 +141,7 @@ jobs:
           (cd "${DESTDIR}" && tar -czf "${GITHUB_WORKSPACE}/dist/malama-${VERSION}-x86_64.pkg.tar.gz" .PKGINFO usr)
           (cd "${DESTDIR}" && tar --zstd -cf "${GITHUB_WORKSPACE}/dist/malama-${VERSION}-x86_64.pkg.tar.zst" .PKGINFO usr)
       - name: Upload Arch Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: arch-packages
           path: dist/malama-*.pkg.tar.*
@@ -156,25 +156,39 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ubuntu:noble
+    env:
+      BOOST_VERSION: "1.87.0"
+      BOOST_INSTALL_PREFIX: "/opt/boost"
     steps:
       - name: Install Build Dependencies
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           apt-get update && apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build git pkg-config \
+            build-essential cmake ninja-build git pkg-config wget \
             libwxgtk3.2-dev libsqlite3-dev libpoppler-cpp-dev \
             libarchive-dev libpugixml-dev libpng-dev libjpeg-dev \
-            libspdlog-dev libboost-all-dev dpkg-dev file ca-certificates
+            libspdlog-dev dpkg-dev file ca-certificates python3
+      - name: Build Boost with Cobalt Support
+        run: |
+          BOOST_UNDERSCORE="$(echo ${BOOST_VERSION} | tr '.' '_')"
+          wget -q "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${BOOST_UNDERSCORE}.tar.gz"
+          tar xzf "boost_${BOOST_UNDERSCORE}.tar.gz"
+          cd "boost_${BOOST_UNDERSCORE}"
+          ./bootstrap.sh --prefix="${BOOST_INSTALL_PREFIX}" --with-libraries=cobalt,system,container
+          ./b2 install -j$(nproc) cxxstd=20 variant=release link=shared threading=multi
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build & Package DEB
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_PREFIX_PATH="${BOOST_INSTALL_PREFIX}"
           cmake --build build --target malama --parallel $(nproc)
           cpack --config build/CPackConfig.cmake -G DEB -B dist_deb
       - name: Upload DEB Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: deb-package
           path: dist_deb/*.deb
@@ -189,23 +203,37 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: fedora:40
+    env:
+      BOOST_VERSION: "1.87.0"
+      BOOST_INSTALL_PREFIX: "/opt/boost"
     steps:
       - name: Install Build Dependencies
         run: |
           dnf install -y --setopt=install_weak_deps=False \
-            gcc-c++ cmake ninja-build git pkgconfig \
+            gcc-c++ cmake ninja-build git pkgconfig wget python3 \
             wxGTK-devel sqlite-devel poppler-cpp-devel \
             libarchive-devel pugixml-devel libpng-devel libjpeg-turbo-devel \
-            spdlog-devel boost-devel rpm-build file
+            spdlog-devel rpm-build file
+      - name: Build Boost with Cobalt Support
+        run: |
+          BOOST_UNDERSCORE="$(echo ${BOOST_VERSION} | tr '.' '_')"
+          wget -q "https://archives.boost.io/release/${BOOST_VERSION}/source/boost_${BOOST_UNDERSCORE}.tar.gz"
+          tar xzf "boost_${BOOST_UNDERSCORE}.tar.gz"
+          cd "boost_${BOOST_UNDERSCORE}"
+          ./bootstrap.sh --prefix="${BOOST_INSTALL_PREFIX}" --with-libraries=cobalt,system,container
+          ./b2 install -j$(nproc) cxxstd=20 variant=release link=shared threading=multi
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Build & Package RPM
         run: |
-          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF \
+            -DCMAKE_PREFIX_PATH="${BOOST_INSTALL_PREFIX}"
           cmake --build build --target malama --parallel $(nproc)
           cpack --config build/CPackConfig.cmake -G RPM -B dist_rpm
       - name: Upload RPM Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rpm-package
           path: dist_rpm/*.rpm
@@ -227,24 +255,24 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Download AppImage Bundle
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: appimage-bundle
           path: release_assets
       - name: Download Arch Packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: arch-packages
           path: release_assets
       - name: Download DEB Package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: deb-package
           path: release_assets
       - name: Download RPM Package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: rpm-package
           path: release_assets
