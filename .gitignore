@@ -2,9 +2,14 @@ build
 .cache
 commit_mssg.txt
 libs
+_deps
+bin
+lib
 build_arch
 build_fedora
 build_ubuntu
+CMakeFiles
+malama
 malama_config.json
 compile_commands.json
 AppDir
@@ -15,4 +20,7 @@ squashfs-root
 ./squashfs-root
 Malama-v0.3.0-x86_64.AppImage
 Malama-v0.3.0-x86_64.AppImage.zsync
+./PKGBUILD/malama/*
+malama-0.3.0.tar.gz
+
 
