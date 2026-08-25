@@ -33,7 +33,9 @@ jobs:
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs appstream
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          submodules: false
       - name: Configure CMake
         run: |
           cmake -B build -G Ninja \
@@ -66,7 +68,9 @@ jobs:
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs wget file appstream
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          submodules: false
       - name: Build AppImage Bundle
         run: |
           chmod +x scripts/build_appimage.sh
@@ -75,7 +79,7 @@ jobs:
         run: |
           ls -la Malama-v*-x86_64.AppImage*
       - name: Upload AppImage Artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: appimage-bundle
           path: |
@@ -102,7 +106,9 @@ jobs:
             libarchive pugixml libpng libjpeg-turbo \
             spdlog boost boost-libs tar zstd gzip
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          submodules: false
       - name: Build & Assemble Arch Package
         run: |
           VERSION=$(grep -oP 'project\(malama VERSION \K[0-9.]+' CMakeLists.txt || echo "0.3.0")
@@ -139,7 +145,7 @@ jobs:
           (cd "${DESTDIR}" && tar -czf "${GITHUB_WORKSPACE}/dist/malama-${VERSION}-x86_64.pkg.tar.gz" .PKGINFO usr)
           (cd "${DESTDIR}" && tar --zstd -cf "${GITHUB_WORKSPACE}/dist/malama-${VERSION}-x86_64.pkg.tar.zst" .PKGINFO usr)
       - name: Upload Arch Artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: arch-packages
           path: dist/malama-*.pkg.tar.*
@@ -176,7 +182,9 @@ jobs:
           ./bootstrap.sh --prefix="${BOOST_INSTALL_PREFIX}" --with-libraries=cobalt,system,container
           ./b2 install -j$(nproc) cxxstd=20 variant=release link=shared threading=multi
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          submodules: false
       - name: Build & Package DEB
         run: |
           cmake -B build -G Ninja \
@@ -186,7 +194,7 @@ jobs:
           cmake --build build --target malama --parallel $(nproc)
           cpack --config build/CPackConfig.cmake -G DEB -B dist_deb
       - name: Upload DEB Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: deb-package
           path: dist_deb/*.deb
@@ -221,7 +229,9 @@ jobs:
           ./bootstrap.sh --prefix="${BOOST_INSTALL_PREFIX}" --with-libraries=cobalt,system,container
           ./b2 install -j$(nproc) cxxstd=20 variant=release link=shared threading=multi
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          submodules: false
       - name: Build & Package RPM
         run: |
           cmake -B build -G Ninja \
@@ -231,7 +241,7 @@ jobs:
           cmake --build build --target malama --parallel $(nproc)
           cpack --config build/CPackConfig.cmake -G RPM -B dist_rpm
       - name: Upload RPM Artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: rpm-package
           path: dist_rpm/*.rpm
@@ -253,24 +263,26 @@ jobs:
       contents: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
+        with:
+          submodules: false
       - name: Download AppImage Bundle
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           name: appimage-bundle
           path: release_assets
       - name: Download Arch Packages
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           name: arch-packages
           path: release_assets
       - name: Download DEB Package
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           name: deb-package
           path: release_assets
       - name: Download RPM Package
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           name: rpm-package
           path: release_assets
