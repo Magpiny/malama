@@ -34,8 +34,6 @@ jobs:
             spdlog boost boost-libs appstream
       - name: Checkout Code
         uses: actions/checkout@v5
-        with:
-          submodules: recursive
       - name: Configure CMake
         run: |
           cmake -B build -G Ninja \
