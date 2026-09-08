@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <filesystem>
 #include <new>
 #include <spdlog/spdlog.h>
@@ -33,6 +34,7 @@
 #include "config/config_manager.hpp"
 #include "engine/export/export_engine.hpp"
 #include "ui/chat_panel.hpp"
+#include "ui/icon_path_resolver.hpp"
 #include "ui/session_params_dlg.hpp"
 #include "ui/settings_dialog.hpp"
 #include "ui/sidebar_panel.hpp"
@@ -47,39 +49,15 @@ namespace {
 ///   5. ./assets/malama.png          (CWD fallback for dev)
 [[nodiscard]] std::filesystem::path resolve_icon_path() noexcept {
     namespace fs = std::filesystem;
-    constexpr const char *kIconRelative = "share/icons/hicolor/256x256/apps/malama.png";
-
-    std::vector<fs::path> candidates;
-
-    // 1. AppImage: $APPDIR environment variable
+    fs::path app_dir;
     const char *appdir = std::getenv("APPDIR");
     if (appdir != nullptr && appdir[0] != '\0') {
-        candidates.emplace_back(fs::path(appdir) / "usr" / kIconRelative);
+        app_dir = appdir;
     }
 
-    // 2 & 3. Relative to the executable
     const std::string exe_str = wxStandardPaths::Get().GetExecutablePath().ToStdString();
-    if (!exe_str.empty()) {
-        const fs::path exe_dir = fs::path(exe_str).parent_path();
-        // FHS: exe is in <prefix>/bin, icon in <prefix>/share/icons/...
-        candidates.emplace_back(exe_dir.parent_path() / kIconRelative);
-        // Dev build: CMake post-build copy puts assets/ next to the binary
-        candidates.emplace_back(exe_dir / "assets" / "malama.png");
-    }
-
-    // 4. System-wide install
-    candidates.emplace_back(fs::path("/usr") / kIconRelative);
-
-    // 5. CWD fallback
-    candidates.emplace_back("assets/malama.png");
-
-    for (const auto &path : candidates) {
-        std::error_code ec;
-        if (fs::exists(path, ec) && !ec) {
-            return path;
-        }
-    }
-    return {};
+    return malama::ui::detail::resolve_icon_path(app_dir, fs::path(exe_str), fs::path("/usr"),
+                                                  fs::path("."));
 }
 
 [[nodiscard]] malama::common::SessionParameters to_common_params(
