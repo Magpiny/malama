@@ -17,7 +17,7 @@ depends=(
   'libpng'
   'libjpeg-turbo'
   'spdlog'
-  'boost-libs'
+  'boost-libs>=1.92.0'
 )
 makedepends=(
   'cmake'
@@ -34,7 +34,7 @@ optdepends=(
 provides=("${pkgname}")
 conflicts=("${pkgname}-git")
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/magpiny/malama/archive/refs/tags/v${pkgver}.tar.gz")
-sha256sums=('390ea6dbddf82e26f339821cf608f8690843967aa311a896eb3f0695a87d29d5')
+sha256sums=('e1b03c3e96361107fc7a14db5084e401763702b8fc8f712a7ccfd7d85d680fc5')
 
 build() {
   cd "${srcdir}/${pkgname}-${pkgver}"

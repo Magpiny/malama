@@ -18,6 +18,7 @@ RUN pacman -Syu --noconfirm && pacman -S --noconfirm \
     git \
     wxwidgets-gtk3 \
     boost \
+    boost-libs \
     && pacman -Scc --noconfirm
 
 WORKDIR /workspace

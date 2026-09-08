@@ -57,6 +57,9 @@ fi
 cp build/malama "${APP_DIR}/usr/bin/malama"
 cp build/malama.desktop "${APP_DIR}/usr/share/applications/malama.desktop"
 cp assets/malama.png "${APP_DIR}/usr/share/icons/hicolor/256x256/apps/malama.png" 2>/dev/null || true
+# Also place icon next to binary so exe-relative resolution works inside AppImage
+mkdir -p "${APP_DIR}/usr/bin/assets"
+cp assets/malama.png "${APP_DIR}/usr/bin/assets/malama.png" 2>/dev/null || true
 if [ -f "assets/org.magpiny.malama.metainfo.xml" ]; then
     cp assets/org.magpiny.malama.metainfo.xml "${APP_DIR}/usr/share/metainfo/"
     if command -v appstreamcli &>/dev/null; then

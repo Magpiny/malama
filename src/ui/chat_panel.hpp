@@ -1,7 +1,7 @@
 // /////////////////////////////////////////////////////////////////////////////
 // Name:        include/ui/chat_panel.hpp
 // Purpose:     Composite multimodal prompt workspace and message canvas layout
-// Author:      Wanjare <wanjare@magpiny.dev>
+// Author:      Wanjare S<samuelwanjare@protonmail.com>
 // Created:     2026-07-07
 // Copyright:   (c) 2026 Magpiny. All rights reserved.
 // Licence:     GPL-3.0-or-later
