@@ -89,6 +89,9 @@ FetchContent_MakeAvailable(glaze)
 #------------------------------------------------------------------------------
 find_package(wxWidgets 3.2 REQUIRED COMPONENTS core base html adv)
 find_package(SQLite3 REQUIRED)
+if(TARGET SQLite::SQLite3 AND NOT TARGET SQLite3::SQLite3)
+  add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
 
@@ -198,7 +201,7 @@ add_custom_command(
 # Conditional Testing Engine Loading
 #------------------------------------------------------------------------------
 include(CTest)
-if(BUILD_TESTING OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
 
@@ -249,11 +252,15 @@ set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 # Debian / Ubuntu (.deb)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Wanjare <samuelwanjare@protonmail.com>")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "amd64")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 
 # Red Hat / Fedora (.rpm)
 set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Internet")
+set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_AUTOREQPROV ON)
 
 include(CPack)

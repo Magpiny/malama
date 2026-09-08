@@ -39,6 +39,49 @@
 
 namespace {
 
+/// Resolves the malama.png icon across all deployment contexts:
+///   1. $APPDIR/usr/share/icons/...  (AppImage runtime)
+///   2. exe_dir/../share/icons/...   (FHS-compliant install)
+///   3. exe_dir/assets/malama.png    (CMake post-build copy / dev builds)
+///   4. /usr/share/icons/hicolor/256x256/apps/malama.png (system install)
+///   5. ./assets/malama.png          (CWD fallback for dev)
+[[nodiscard]] std::filesystem::path resolve_icon_path() noexcept {
+    namespace fs = std::filesystem;
+    constexpr const char *kIconRelative = "share/icons/hicolor/256x256/apps/malama.png";
+
+    std::vector<fs::path> candidates;
+
+    // 1. AppImage: $APPDIR environment variable
+    const char *appdir = std::getenv("APPDIR");
+    if (appdir != nullptr && appdir[0] != '\0') {
+        candidates.emplace_back(fs::path(appdir) / "usr" / kIconRelative);
+    }
+
+    // 2 & 3. Relative to the executable
+    const std::string exe_str = wxStandardPaths::Get().GetExecutablePath().ToStdString();
+    if (!exe_str.empty()) {
+        const fs::path exe_dir = fs::path(exe_str).parent_path();
+        // FHS: exe is in <prefix>/bin, icon in <prefix>/share/icons/...
+        candidates.emplace_back(exe_dir.parent_path() / kIconRelative);
+        // Dev build: CMake post-build copy puts assets/ next to the binary
+        candidates.emplace_back(exe_dir / "assets" / "malama.png");
+    }
+
+    // 4. System-wide install
+    candidates.emplace_back(fs::path("/usr") / kIconRelative);
+
+    // 5. CWD fallback
+    candidates.emplace_back("assets/malama.png");
+
+    for (const auto &path : candidates) {
+        std::error_code ec;
+        if (fs::exists(path, ec) && !ec) {
+            return path;
+        }
+    }
+    return {};
+}
+
 [[nodiscard]] malama::common::SessionParameters to_common_params(
     const malama::core::ModelParameters &params) noexcept {
     return malama::common::SessionParameters{.m_temperature = params.m_temperature,
@@ -123,45 +166,29 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
     setup_workspace_layout();
     bind_action_events();
 
+    load_application_icon();
     apply_appearance_settings();
     LoadMostRecentSessionOnStartup();
 }
 
 void MainFrame::load_application_icon() noexcept {
-    namespace fs = std::filesystem;
-
-    const std::string exe_full_path = wxStandardPaths::Get().GetExecutablePath().ToStdString();
-    const fs::path exe_dir = fs::path(exe_full_path).parent_path();
-
-    const std::vector<fs::path> candidate_paths = {
-        exe_dir / "assets" / "malama.png", exe_dir / "assets" / "malama.png",
-        exe_dir / "malama.png", fs::path("./assets/malama.png")};
-
-    fs::path target_image_path;
-    for (const auto &candidate : candidate_paths) {
-        if (fs::exists(candidate)) {
-            target_image_path = candidate;
-            break;
-        }
-    }
-
-    if (target_image_path.empty()) {
-        spdlog::warn("Icon file not found in build assets. Checked path: {}",
-                     (exe_dir / "assets").string());
+    const auto icon_path = resolve_icon_path();
+    if (icon_path.empty()) {
+        spdlog::warn("Application icon not found in any search path.");
         return;
     }
 
     wxImage logo_image;
-    if (logo_image.LoadFile(wxString::FromUTF8(target_image_path.string()), wxBITMAP_TYPE_PNG) &&
+    if (logo_image.LoadFile(wxString::FromUTF8(icon_path.string()), wxBITMAP_TYPE_PNG) &&
         logo_image.IsOk()) {
         wxBitmap logo_bitmap(logo_image);
         wxIcon app_icon;
         app_icon.CopyFromBitmap(logo_bitmap);
 
         SetIcon(app_icon);
-        spdlog::info("Successfully loaded frame icon from: {}", target_image_path.string());
+        spdlog::info("Successfully loaded frame icon from: {}", icon_path.string());
     } else {
-        spdlog::error("Failed to decode PNG image buffer at: {}", target_image_path.string());
+        spdlog::error("Failed to decode PNG image at: {}", icon_path.string());
     }
 }
 
@@ -436,18 +463,13 @@ void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     info.SetWebSite(wxT("https://magpiny.github.io/malama"));
     info.AddDeveloper(wxT("Magpiny"));
 
-    wxIcon logo_icon;
-    if (wxFileExists(wxT("assets/malama.png"))) {
-        logo_icon.LoadFile(wxT("assets/malama.png"), wxBITMAP_TYPE_PNG);
-    } else if (wxFileExists(wxT("malama.png"))) {
-        logo_icon.LoadFile(wxT("malama.png"), wxBITMAP_TYPE_PNG);
-    } else if (wxFileExists(wxT("/usr/share/icons/hicolor/256x256/apps/malama.png"))) {
-        logo_icon.LoadFile(wxT("/usr/share/icons/hicolor/256x256/apps/malama.png"),
-                           wxBITMAP_TYPE_PNG);
-    }
-
-    if (logo_icon.IsOk()) {
-        info.SetIcon(logo_icon);
+    const auto icon_path = resolve_icon_path();
+    if (!icon_path.empty()) {
+        wxIcon logo_icon;
+        logo_icon.LoadFile(wxString::FromUTF8(icon_path.string()), wxBITMAP_TYPE_PNG);
+        if (logo_icon.IsOk()) {
+            info.SetIcon(logo_icon);
+        }
     }
 
     wxAboutBox(info, this);
