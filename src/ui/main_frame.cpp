@@ -44,7 +44,14 @@ namespace {
 ///   2. exe_dir/../share/icons/...   (FHS-compliant install)
 ///   3. exe_dir/assets/malama.png    (CMake post-build copy / dev builds)
 ///   4. /usr/share/icons/hicolor/256x256/apps/malama.png (system install)
-///   5. ./assets/malama.png          (CWD fallback for dev)
+/**
+ * @brief Locates the application icon in supported deployment locations.
+ *
+ * Searches AppImage, executable-relative, system-wide, and current-working-directory
+ * locations for the application icon.
+ *
+ * @return The path to the first existing icon file, or an empty path if none is found.
+ */
 [[nodiscard]] std::filesystem::path resolve_icon_path() noexcept {
     namespace fs = std::filesystem;
     constexpr const char *kIconRelative = "share/icons/hicolor/256x256/apps/malama.png";
@@ -82,6 +89,12 @@ namespace {
     return {};
 }
 
+/**
+ * @brief Converts core model parameters to common session parameters.
+ *
+ * @param params Core model parameters to convert.
+ * @return malama::common::SessionParameters Equivalent session parameters.
+ */
 [[nodiscard]] malama::common::SessionParameters to_common_params(
     const malama::core::ModelParameters &params) noexcept {
     return malama::common::SessionParameters{.m_temperature = params.m_temperature,
@@ -144,6 +157,14 @@ static void apply_styles_recursively(wxWindow *window_ptr, const wxColour &bg_co
     window_ptr->Refresh();
 }
 
+/**
+ * @brief Initializes the main application window and its session state.
+ *
+ * @param title Window title.
+ * @param pos Initial window position.
+ * @param size Initial window dimensions.
+ * @param on_prompt_submit Callback invoked when the user submits a prompt.
+ */
 MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &size,
                      std::function<void(const std::string &)> on_prompt_submit)
     : wxFrame(nullptr, wxID_ANY, title, pos, size),
@@ -171,6 +192,9 @@ MainFrame::MainFrame(const wxString &title, const wxPoint &pos, const wxSize &si
     LoadMostRecentSessionOnStartup();
 }
 
+/**
+ * @brief Loads the application icon and assigns it to the main frame.
+ */
 void MainFrame::load_application_icon() noexcept {
     const auto icon_path = resolve_icon_path();
     if (icon_path.empty()) {
@@ -453,6 +477,9 @@ void MainFrame::on_exit_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     Close(true);
 }
 
+/**
+ * @brief Displays the application's About dialog.
+ */
 void MainFrame::on_about_action(wxCommandEvent &WXUNUSED(event)) noexcept {
     wxAboutDialogInfo info;
     info.SetName(_("Malama"));
