@@ -8,7 +8,7 @@
 #/////////////////////////////////////////////////////////////////////////////
 
 cmake_minimum_required(VERSION 3.28)
-project(malama VERSION 0.3.0 LANGUAGES CXX)
+project(malama VERSION 0.3.3 LANGUAGES CXX)
 
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)

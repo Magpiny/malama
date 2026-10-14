@@ -35,6 +35,7 @@ add_executable(malama_tests
     unit/test_mime_detector.cpp
     unit/test_attachment_bounds.cpp
     unit/test_context_enclosure.cpp
+    unit/test_icon_path_resolver.cpp
     unit/test_install_validator.cpp
     unit/test_v030_subsystems.cpp 
     stress/test_stream_performance.cpp
